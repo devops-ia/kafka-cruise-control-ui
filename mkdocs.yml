@@ -1,0 +1,59 @@
+site_name: Kafka Cruise Control UI
+site_description: A web UI and authenticated proxy for Kafka Cruise Control 3.x
+site_url: https://devops-ia.github.io/kafka-cruise-control-ui/
+repo_name: devops-ia/kafka-cruise-control-ui
+repo_url: https://github.com/devops-ia/kafka-cruise-control-ui
+edit_uri: edit/main/docs/
+docs_dir: docs
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.indexes
+    - toc.follow
+    - content.code.copy
+
+markdown_extensions:
+  - admonition
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - toc:
+      permalink: true
+
+nav:
+  - Home: README.md
+  - Getting started:
+      - Quick start: QUICKSTART.md
+      - Installation and deployment: DEPLOYMENT.md
+  - Configuration:
+      - Variables: CONFIGURATION.md
+      - Authentication: AUTHENTICATION.md
+      - Clusters: CLUSTERS.md
+  - Using the UI:
+      - User guide: USER_GUIDE.md
+  - Reference:
+      - Architecture: ARCHITECTURE.md
+      - Security: SECURITY.md
+      - API: API.md
+  - Operations:
+      - Troubleshooting: TROUBLESHOOTING.md
+      - Migration from the legacy UI: MIGRATION.md
