@@ -1,6 +1,10 @@
 # kafka-cruise-control-ui
 
-A web UI for [Cruise Control](https://github.com/linkedin/cruise-control) 3.x. One static Go binary serves an embedded single-page app (Preact, TypeScript, Vite) and acts as an authenticated reverse proxy to one or more Cruise Control clusters.
+A web UI for [Cruise Control](https://github.com/cruise-control-for-kafka/cruise-control) `3.x`. One static Go binary serves an embedded single-page app and acts as an authenticated reverse proxy to one or more Cruise Control clusters. Documentation: https://devops-ia.github.io/kafka-cruise-control-ui/.
+
+<p align="center">
+  <img src="docs/assets/carousel.gif" alt="Slideshow of the UI: summary, cluster state, Cruise Control state (analyzer and executor), config insights and admin" width="900">
+</p>
 
 The browser only talks to this server. Cruise Control credentials stay in the server's environment: they are never sent to the browser, never put in a URL or a request body, and never logged.
 
@@ -186,7 +190,7 @@ CCUI_CLUSTERS__1__TIMEOUT=120s
 
 ## Development
 
-You need Go 1.26 or newer and Node 22 or newer.
+You need Go `1.26` or newer and `Node 22` or newer.
 
 ```sh
 cd web && npm ci && npm run build && cd ..   # builds the SPA into web/dist, which the binary embeds
