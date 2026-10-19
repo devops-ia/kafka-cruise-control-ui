@@ -740,9 +740,6 @@ progress.bar::-moz-progress-bar {
   flex: none;
   white-space: nowrap;
 }
-.op-panel {
-  max-width: 900px;
-}
 .op-head p {
   margin: var(--s1) 0 0;
 }
