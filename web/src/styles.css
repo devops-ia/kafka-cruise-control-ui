@@ -881,8 +881,7 @@ progress.bar::-moz-progress-bar {
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 .dist {
-  align-self: start;
-  width: min(100%, 460px);
+  width: 100%;
 }
 .dist th[scope="row"] {
   text-align: left;
