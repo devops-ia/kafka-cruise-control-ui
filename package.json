@@ -1,0 +1,14 @@
+{
+  "name": "kafka-cruise-control-ui",
+  "version": "1.0.0",
+  "release": {
+    "branches": [
+      "main"
+    ],
+    "repositoryUrl": "https://github.com/devops-ia/kafka-cruise-control-ui.git",
+    "plugins": [
+      "@semantic-release/release-notes-generator",
+      "@semantic-release/github"
+    ]
+  }
+}

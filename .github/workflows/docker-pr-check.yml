@@ -5,33 +5,26 @@ permissions:
 
 on:
   pull_request:
-    branches: [main]
+    branches:
+      - main
 
 jobs:
-  build-scan:
-    name: Build image and scan for vulnerabilities
+  dive-check:
+    name: Dive image efficiency check
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Build image
+        run: docker build -t kafka-cruise-control-ui:pr .
 
-      - name: Build image (no push)
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: .
-          load: true
-          push: false
-          tags: kafka-cruise-control-ui:pr
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Scan image with Trivy
+      - name: Run dive
         run: |
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
-            aquasec/trivy:0.58.1 image \
-            --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed \
-            kafka-cruise-control-ui:pr
+            -v "$PWD":/repo \
+            -w /repo \
+            wagoodman/dive:v0.13.1 \
+            kafka-cruise-control-ui:pr --ci --ci-config .dive-ci
