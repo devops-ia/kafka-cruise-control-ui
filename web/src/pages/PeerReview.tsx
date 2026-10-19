@@ -1,4 +1,5 @@
-import { Async } from "../components/Async";
+import { ApiError } from "../api";
+import { Async, RefreshBar } from "../components/Async";
 import { Table } from "../components/Table";
 import { formatTime } from "../format";
 import { useResource } from "../hooks";
@@ -42,6 +43,18 @@ function Actions({ r, reload }: { r: any; reload: () => void }) {
 
 export function PeerReview() {
   const res = useResource("review_board");
+  // CC refuses review_board when two-step verification is off (a 403 today); the status is not worth pinning, the message is.
+  if (res.error instanceof ApiError && /two\.step\.verification/i.test(res.error.message) && !res.data) {
+    return (
+      <section aria-labelledby="page-title" class="stack">
+        <div class="page-head">
+          <h1 id="page-title">Peer review</h1>
+          <RefreshBar updatedAt={res.updatedAt} loading={res.loading} onReload={res.reload} />
+        </div>
+        <p class="state">Two-step verification is disabled on this cluster, so there is nothing to review. Set two.step.verification.enabled=true in Cruise Control to use it.</p>
+      </section>
+    );
+  }
   return (
     <Async title="Peer review" res={res} empty={(d) => !d.RequestInfo?.length}>
       {(d) => (

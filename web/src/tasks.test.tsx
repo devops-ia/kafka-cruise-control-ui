@@ -102,4 +102,23 @@ describe("two-step verification", () => {
     expect(exec.query.get("review_id")).toBe("7");
     expect(exec.query.get("dryrun")).toBe("false");
   });
+
+  it("Peer review shows a neutral note when two-step verification is disabled, whatever the status", async () => {
+    mockFetch((c) =>
+      c.path.endsWith("/review_board")
+        ? { status: 403, body: { errorMessage: "Attempt to access REVIEW_BOARD endpoint without enabling 'two.step.verification.enabled' config." } }
+        : undefined,
+    );
+    render(<PeerReview />);
+    expect(await screen.findByText(/Two-step verification is disabled on this cluster/)).toBeTruthy();
+    expect(screen.queryByText(/Attempt to access/)).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("Peer review still shows other errors with the usual state", async () => {
+    mockFetch((c) => (c.path.endsWith("/review_board") ? { status: 502, body: { error: "cluster unavailable" } } : undefined));
+    render(<PeerReview />);
+    expect(await screen.findByText(/cluster unavailable/)).toBeTruthy();
+    expect(screen.queryByText(/Two-step verification is disabled/)).toBeNull();
+  });
 });
