@@ -102,6 +102,16 @@ describe("read pages", () => {
     expect(health.querySelector(".nested")).toBeNull();
   });
 
+  it("Cluster state does not count CC's \"other\" group, which holds the healthy partitions, as an issue", async () => {
+    const healthy = [0, 1, 2].map((partition) => ({ topic: "orders", partition, leader: 0, replicas: [0], "in-sync": [0], "out-of-sync": [] }));
+    const calls = serve({ kafka_cluster_state: { ...clusterState, KafkaPartitionState: { offline: [], urp: [], "with-offline-replicas": [], "under-min-isr": [], other: healthy } } });
+    render(<ClusterState />);
+    await screen.findByText("all clear");
+    expect(screen.queryByText(/issues/)).toBeNull();
+    expect(screen.queryByText("DEGRADED")).toBeNull();
+    expect(calls[0].query.get("verbose")).toBeNull(); // verbose=true makes CC send every healthy partition
+  });
+
   it("Cluster state lists both under-replicated partitions in the alert row", async () => {
     const urp = [3, 4].map((partition) => ({ topic: "orders", partition, leader: 0, replicas: [0, 1], "in-sync": [0], "out-of-sync": [1] }));
     serve({ kafka_cluster_state: { ...clusterState, KafkaPartitionState: { ...clusterState.KafkaPartitionState, urp } } });

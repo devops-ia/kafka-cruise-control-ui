@@ -8,12 +8,12 @@ const GROUPS: [string, string][] = [
   ["with-offline-replicas", "Partitions with offline replicas"],
   ["urp", "Under-replicated partitions"],
   ["under-min-isr", "Under min ISR"],
-  ["other", "Other"], // shown only when CC reports something in it
 ];
 
 /** One table for all partition categories; a category with partitions is flagged and lists them right under its row. */
 function Health({ parts }: { parts: Record<string, any[]> }) {
-  const cats = GROUPS.map(([key, title]) => ({ key, title, rows: parts[key] ?? [] })).filter((c) => c.key !== "other" || c.rows.length);
+  // CC's "other" group holds the healthy partitions (sent only with verbose=true), so it is not a category.
+  const cats = GROUPS.map(([key, title]) => ({ key, title, rows: parts[key] ?? [] }));
   const issues = cats.reduce((n, c) => n + c.rows.length, 0);
   return (
     <div class="panel" role="region" aria-label="Partition health">
@@ -153,7 +153,7 @@ function Totals({ summary }: { summary: Record<string, unknown> }) {
 }
 
 export function ClusterState() {
-  const res = useResource("kafka_cluster_state", { verbose: true });
+  const res = useResource("kafka_cluster_state");
   return (
     <Async title="Cluster state" res={res}>
       {(d) => {
