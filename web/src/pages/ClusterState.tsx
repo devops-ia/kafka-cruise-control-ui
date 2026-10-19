@@ -87,6 +87,71 @@ export function brokerRows(state: any) {
   }));
 }
 
+const HEADLINE: [string, string][] = [
+  ["Brokers", "Brokers"],
+  ["Topics", "Topics"],
+  ["Leaders", "Leaders"],
+  ["Replicas", "Replicas"],
+  ["AvgReplicationFactor", "Avg RF"],
+];
+const DIST = ["Leaders", "Replicas"];
+const DIST_COLS: [string, string][] = [
+  ["Avg", "Avg"],
+  ["Max", "Max"],
+  ["Std", "Std dev"],
+];
+const round = (v: unknown) => (typeof v === "number" ? String(Math.round(v * 100) / 100) : v == null ? "" : String(v));
+
+/** Headline totals in a fixed order, the per-broker distribution as a small table; any other Summary key goes in an Other row. */
+function Totals({ summary }: { summary: Record<string, unknown> }) {
+  const shown = new Set(HEADLINE.map(([k]) => k));
+  DIST.forEach((n) => DIST_COLS.forEach(([c]) => shown.add(`${c}${n}PerBroker`)));
+  const other = Object.entries(summary).filter(([k]) => !shown.has(k));
+  return (
+    <>
+      <dl class="stats stats-fixed" role="group" aria-label="Cluster totals">
+        {HEADLINE.filter(([k]) => summary[k] !== undefined).map(([k, label]) => (
+          <div key={k}>
+            <dt>{label}</dt>
+            <dd>{round(summary[k])}</dd>
+          </div>
+        ))}
+      </dl>
+      <div class="panel dist" role="region" aria-label="Distribution per broker">
+        <div class="panel-head">
+          <h2>Distribution per broker</h2>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th scope="col"></th>
+              {DIST_COLS.map(([, l]) => (
+                <th key={l} scope="col" class="num">{l}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {DIST.map((n) => (
+              <tr key={n}>
+                <th scope="row">{n}</th>
+                {DIST_COLS.map(([c]) => (
+                  <td key={c} class="num mono">{round(summary[`${c}${n}PerBroker`])}</td>
+                ))}
+              </tr>
+            ))}
+            {other.length > 0 && (
+              <tr>
+                <th scope="row">Other</th>
+                <td colSpan={3} class="mono">{other.map(([k, v]) => `${k}: ${round(v)}`).join(", ")}</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}
+
 export function ClusterState() {
   const res = useResource("kafka_cluster_state", { verbose: true });
   return (
@@ -96,21 +161,10 @@ export function ClusterState() {
         const parts = d.KafkaPartitionState ?? {};
         return (
           <div class="stack">
-            {summary && (
-              <dl class="stats">
-                {Object.entries(summary).map(([k, v]) => (
-                  <div key={k}>
-                    <dt>{k}</dt>
-                    <dd>{typeof v === "number" ? Math.round(v * 100) / 100 : String(v)}</dd>
-                  </div>
-                ))}
-              </dl>
-            )}
-            <Health parts={parts} />
-            <h2>Brokers</h2>
+            {summary && <Totals summary={summary} />}
             <Table
               caption="Brokers"
-              rows={brokerRows(d)}
+              rows={brokerRows(d).sort((a, b) => a.id - b.id)}
               rowKey={(r) => r.id}
               columns={[
                 { key: "id", header: "Broker", value: (r) => r.id, numeric: true },
@@ -122,6 +176,7 @@ export function ClusterState() {
                 { key: "dirs", header: "Offline dirs", value: (r) => r.offlineDirs, numeric: true },
               ]}
             />
+            <Health parts={parts} />
           </div>
         );
       }}

@@ -387,7 +387,8 @@ label {
 .tabs button:hover:not(:disabled) {
   color: var(--ink);
 }
-.tabs button[aria-pressed="true"] {
+.tabs button[aria-pressed="true"],
+.tabs button[aria-selected="true"] {
   color: var(--ink);
   font-weight: 600;
   border-bottom-color: var(--accent);
@@ -730,32 +731,50 @@ progress.bar::-moz-progress-bar {
 }
 
 /* Admin */
-.admin-layout {
+.op-tabs {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  margin-bottom: var(--s4);
+}
+.op-tabs button {
+  flex: none;
+  white-space: nowrap;
+}
+.op-panel {
+  max-width: 900px;
+}
+.op-head p {
+  margin: var(--s1) 0 0;
+}
+.op-head h2 {
+  font-size: 14px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink);
+}
+.form-grid {
   display: grid;
-  grid-template-columns: 220px 1fr;
-  gap: var(--s5);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s4);
 }
-.op-list ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--s1);
+.form-grid .field.wide {
+  grid-column: 1 / -1;
 }
-.op-list button {
+.form-grid .field input:not([type="checkbox"]) {
   width: 100%;
-  text-align: left;
 }
-.op-list button[aria-current="true"] {
-  background: var(--accent);
-  color: var(--on-accent);
-  border-color: var(--accent);
+.req {
+  color: var(--bad);
+}
+.goals > summary {
+  cursor: pointer;
+  font-weight: 600;
 }
 .goal-groups {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--s4);
-  flex-wrap: wrap;
+  margin-top: var(--s3);
 }
 .goal-groups fieldset {
   border: 1px solid var(--line);
@@ -763,10 +782,26 @@ progress.bar::-moz-progress-bar {
   display: flex;
   flex-direction: column;
   gap: var(--s1);
-  min-width: 260px;
+  min-width: 0;
 }
-@media (max-width: 800px) {
-  .admin-layout {
+.actions-bar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--s3);
+  padding: var(--s3) var(--s4);
+  background: var(--sunken);
+  border-top: 1px solid var(--line);
+}
+.actions-bar .actions {
+  gap: var(--s5);
+}
+@media (max-width: 640px) {
+  .form-grid,
+  .goal-groups {
     grid-template-columns: 1fr;
   }
 }
@@ -842,4 +877,22 @@ progress.bar::-moz-progress-bar {
   display: flex;
   flex-direction: column;
   align-items: stretch;
+}
+
+/* Cluster state: one row of headline cells that always fills the width */
+.stats.stats-fixed {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+.dist {
+  align-self: start;
+  width: min(100%, 460px);
+}
+.dist th[scope="row"] {
+  text-align: left;
+  font-weight: 600;
+}
+@media (max-width: 560px) {
+  .stats.stats-fixed {
+    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  }
 }

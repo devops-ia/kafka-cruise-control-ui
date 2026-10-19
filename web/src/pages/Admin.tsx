@@ -37,16 +37,18 @@ function FieldInput({ f, values, set }: { f: Field; values: Values; set: (name: 
   const id = `f-${f.name}`;
   if (f.kind === "goals") {
     return (
-      <div class="field">
-        <span class="label">{f.label}</span>
-        <GoalPicker value={String(values[f.name] ?? "")} onChange={(v) => set(f.name, v)} />
+      <div class="field wide">
+        <details class="goals">
+          <summary>Goals, optional</summary>
+          <GoalPicker value={String(values[f.name] ?? "")} onChange={(v) => set(f.name, v)} />
+        </details>
         {f.help && <small class="muted">{f.help}</small>}
       </div>
     );
   }
   if (f.kind === "bool") {
     return (
-      <label class="check field">
+      <label class="check field wide">
         <input type="checkbox" name={f.name} checked={values[f.name] === true} onChange={(e) => set(f.name, (e.target as HTMLInputElement).checked)} /> {f.label}
       </label>
     );
@@ -63,7 +65,12 @@ function FieldInput({ f, values, set }: { f: Field; values: Values; set: (name: 
     <div class="field">
       <label for={id}>
         {f.label}
-        {f.required && <span aria-hidden="true"> *</span>}
+        {f.required && (
+          <span class="req" aria-hidden="true">
+            {" "}
+            *
+          </span>
+        )}
       </label>
       {f.kind === "number" ? <input {...common} type="number" min={0} /> : <input {...common} type="text" />}
       {f.help && (
@@ -90,21 +97,30 @@ function OperationForm({ op }: { op: Operation }) {
   const execute = () => (op.confirm ? setConfirming(true) : run(op.dryRunnable ? false : undefined));
 
   return (
-    <form ref={form} class="stack op-form" onSubmit={(e) => e.preventDefault()} aria-labelledby="op-title">
-      <h2 id="op-title">{op.title}</h2>
-      <p>{op.description}</p>
-      {op.fields.map((f) => (
-        <FieldInput key={f.name} f={f} values={values} set={set} />
-      ))}
-      <div class="actions">
-        {op.dryRunnable && (
-          <button type="button" onClick={() => run(true)}>
-            Simulate
+    <form ref={form} class="op-form" onSubmit={(e) => e.preventDefault()} aria-labelledby="op-title">
+      <div class="panel-head op-head">
+        <div>
+          <h2 id="op-title">{op.title}</h2>
+          <p class="muted">{op.description}</p>
+        </div>
+      </div>
+      <div class="panel-body form-grid">
+        {op.fields.map((f) => (
+          <FieldInput key={f.name} f={f} values={values} set={set} />
+        ))}
+      </div>
+      <div class="actions-bar">
+        <div class="actions">
+          {op.dryRunnable && (
+            <button type="button" class="primary" onClick={() => run(true)}>
+              Simulate
+            </button>
+          )}
+          <button type="button" class="danger" onClick={execute}>
+            {op.dryRunnable ? "Execute" : "Apply"}
           </button>
-        )}
-        <button type="button" class="danger" onClick={execute}>
-          {op.dryRunnable ? "Execute" : "Apply"}
-        </button>
+        </div>
+        {op.dryRunnable && <small class="muted">Execute changes the real cluster, Simulate does not.</small>}
       </div>
       {confirming && (
         <ConfirmDialog
@@ -143,24 +159,41 @@ function OperationForm({ op }: { op: Operation }) {
 
 export function Admin() {
   const [id, setId] = useState(OPERATIONS[0].id);
-  const op = OPERATIONS.find((o) => o.id === id)!;
+  const list = useRef<HTMLDivElement>(null);
+  const idx = OPERATIONS.findIndex((o) => o.id === id);
+  const op = OPERATIONS[idx];
+  // WAI-ARIA tabs: arrows wrap, Home/End jump; focus follows selection.
+  const onKeyDown = (e: KeyboardEvent) => {
+    const n = OPERATIONS.length;
+    const to = { ArrowRight: (idx + 1) % n, ArrowLeft: (idx + n - 1) % n, Home: 0, End: n - 1 }[e.key];
+    if (to === undefined) return;
+    e.preventDefault();
+    setId(OPERATIONS[to].id);
+    (list.current?.querySelectorAll<HTMLElement>('[role="tab"]')[to])?.focus();
+  };
   return (
     <section aria-labelledby="page-title">
       <div class="page-head">
         <h1 id="page-title">Admin</h1>
       </div>
-      <div class="admin-layout">
-        <nav aria-label="Operations" class="op-list">
-          <ul>
-            {OPERATIONS.map((o) => (
-              <li key={o.id}>
-                <button type="button" aria-current={o.id === id ? "true" : undefined} onClick={() => setId(o.id)}>
-                  {o.title}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </nav>
+      <div class="tabs op-tabs" role="tablist" aria-label="Operations" ref={list}>
+        {OPERATIONS.map((o) => (
+          <button
+            key={o.id}
+            type="button"
+            role="tab"
+            id={`tab-${o.id}`}
+            aria-selected={o.id === id}
+            aria-controls="op-panel"
+            tabIndex={o.id === id ? 0 : -1}
+            onClick={() => setId(o.id)}
+            onKeyDown={onKeyDown}
+          >
+            {o.title}
+          </button>
+        ))}
+      </div>
+      <div class="panel op-panel" role="tabpanel" id="op-panel" aria-labelledby={`tab-${op.id}`}>
         <OperationForm key={op.id} op={op} />
       </div>
     </section>

@@ -59,6 +59,39 @@ describe("read pages", () => {
     expect(screen.queryByRole("heading", { name: /Under-replicated partitions/ })).toBeNull();
   });
 
+  it("Cluster state puts the stat strip, then brokers, then partition health, with readable labels and a distribution table", async () => {
+    const Summary = {
+      Brokers: 3, Topics: 5, Leaders: 70, Replicas: 200, AvgReplicationFactor: 2.6666,
+      AvgLeadersPerBroker: 23.33, MaxLeadersPerBroker: 40, StdLeadersPerBroker: 6.5,
+      AvgReplicasPerBroker: 66.67, MaxReplicasPerBroker: 120, StdReplicasPerBroker: 20.1, Mystery: 7,
+    };
+    serve({ kafka_cluster_state: { ...clusterState, KafkaBrokerState: { ...clusterState.KafkaBrokerState, Summary } } });
+    const { container } = render(<ClusterState />);
+    const strip = await screen.findByRole("group", { name: "Cluster totals" });
+    expect([...strip.querySelectorAll("dt")].map((e) => e.textContent)).toEqual(["Brokers", "Topics", "Leaders", "Replicas", "Avg RF"]);
+    expect([...strip.querySelectorAll("dd")].map((e) => e.textContent)).toEqual(["3", "5", "70", "200", "2.67"]);
+    const order = [strip, screen.getByRole("region", { name: "Brokers" }), screen.getByRole("region", { name: "Partition health" })];
+    order.slice(1).forEach((el, i) => expect(order[i].compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy());
+    expect(container.textContent).not.toMatch(/LeadersPerBroker|ReplicasPerBroker|AvgReplicationFactor/);
+    const dist = screen.getByRole("region", { name: "Distribution per broker" });
+    const cells = (name: RegExp) => within(within(dist).getByRole("row", { name })).getAllByRole("cell").map((c) => c.textContent);
+    expect(within(dist).getAllByRole("columnheader").map((h) => h.textContent)).toEqual(["", "Avg", "Max", "Std dev"]);
+    expect(cells(/^Leaders/)).toEqual(["23.33", "40", "6.5"]);
+    expect(cells(/^Replicas/)).toEqual(["66.67", "120", "20.1"]);
+    expect(cells(/^Other/)).toEqual(["Mystery: 7"]); // unknown keys are not dropped
+  });
+
+  it("Cluster state lists brokers by id ascending in the documented column order", async () => {
+    const b = clusterState.KafkaBrokerState;
+    const rev = (o: Record<string, unknown>) => Object.fromEntries(Object.entries(o).reverse());
+    serve({ kafka_cluster_state: { ...clusterState, KafkaBrokerState: { ...b, LeaderCountByBrokerId: rev(b.LeaderCountByBrokerId), ReplicaCountByBrokerId: rev(b.ReplicaCountByBrokerId) } } });
+    render(<ClusterState />);
+    const brokers = await screen.findByRole("region", { name: "Brokers" });
+    expect(within(brokers).getAllByRole("columnheader").map((h) => h.textContent?.trim())).toEqual(["Broker", "Role", "Leaders", "Replicas", "Out of sync", "Offline replicas", "Offline dirs"]);
+    const ids = within(brokers).getAllByRole("row").slice(-2).map((r) => within(r).getAllByRole("cell")[0].textContent);
+    expect(ids).toEqual(["0", "1"]);
+  });
+
   it("Cluster state with four empty categories shows four OK rows and no lists", async () => {
     serve({ kafka_cluster_state: { ...clusterState, KafkaPartitionState: { offline: [], urp: [], "with-offline-replicas": [], "under-min-isr": [], other: [] } } });
     render(<ClusterState />);
