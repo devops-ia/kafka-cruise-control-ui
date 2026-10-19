@@ -19,6 +19,8 @@ jobs:
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
+          # go.mod says 1.26.0; without this CI installs exactly that and govulncheck reports every stdlib fix since
+          check-latest: true
 
       - name: Vet
         run: go vet ./...
@@ -37,6 +39,8 @@ jobs:
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
+          # go.mod says 1.26.0; without this CI installs exactly that and govulncheck reports every stdlib fix since
+          check-latest: true
 
       - name: Check dependencies for known vulnerabilities
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
