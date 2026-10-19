@@ -1,0 +1,23 @@
+name: Build and Push Docker Image
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    permissions:
+      artifact-metadata: write
+      attestations: write
+      contents: write
+      id-token: write
+      packages: write
+    uses: devops-ia/.github/.github/workflows/docker-build.yml@main
+    with:
+      dockerhub_repo: kafka-cruise-control-ui
+      image_title: Kafka Cruise Control UI
+      image_description: Web UI and authenticated proxy for one or more Kafka Cruise Control clusters
+    secrets:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}

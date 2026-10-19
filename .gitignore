@@ -1,0 +1,9 @@
+wip/
+web/node_modules/
+web/dist/*
+!web/dist/.gitkeep
+/server
+/coverage
+
+# mkdocs output
+site/

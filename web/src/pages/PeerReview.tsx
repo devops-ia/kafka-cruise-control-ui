@@ -1,0 +1,80 @@
+import { ApiError } from "../api";
+import { Async, RefreshBar } from "../components/Async";
+import { Table } from "../components/Table";
+import { formatTime } from "../format";
+import { useResource } from "../hooks";
+import { parseEndpointWithParams } from "../ops";
+import { cluster as clusterStore, useStore } from "../store";
+import { runTask } from "../tasks";
+
+
+function Actions({ r, reload }: { r: any; reload: () => void }) {
+  const cluster = useStore(clusterStore);
+  const id = String(r.Id);
+  const review = async (verb: "approve" | "discard") => {
+    await runTask(cluster, "review", { [verb]: id });
+    reload();
+  };
+  const execute = async () => {
+    const { endpoint, params } = parseEndpointWithParams(String(r.EndpointWithParams));
+    await runTask(cluster, endpoint, { ...params, review_id: id });
+    reload();
+  };
+  return (
+    <span class="actions">
+      {r.Status === "PENDING_REVIEW" && (
+        <button type="button" onClick={() => review("approve")}>
+          Approve
+        </button>
+      )}
+      {r.Status === "APPROVED" && (
+        <button type="button" class="danger" onClick={execute}>
+          Execute
+        </button>
+      )}
+      {(r.Status === "PENDING_REVIEW" || r.Status === "APPROVED") && (
+        <button type="button" onClick={() => review("discard")}>
+          Discard
+        </button>
+      )}
+    </span>
+  );
+}
+
+export function PeerReview() {
+  const res = useResource("review_board");
+  // CC refuses review_board when two-step verification is off (a 403 today); the status is not worth pinning, the message is.
+  if (res.error instanceof ApiError && /two\.step\.verification/i.test(res.error.message) && !res.data) {
+    return (
+      <section aria-labelledby="page-title" class="stack">
+        <div class="page-head">
+          <h1 id="page-title">Peer review</h1>
+          <RefreshBar updatedAt={res.updatedAt} loading={res.loading} onReload={res.reload} />
+        </div>
+        <p class="state">Two-step verification is disabled on this cluster, so there is nothing to review. Set two.step.verification.enabled=true in Cruise Control to use it.</p>
+      </section>
+    );
+  }
+  return (
+    <Async title="Peer review" res={res} empty={(d) => !d.RequestInfo?.length}>
+      {(d) => (
+        <div class="stack">
+          <Table
+            caption="Requests waiting for review"
+            rows={d.RequestInfo}
+            rowKey={(r: any) => r.Id}
+            columns={[
+              { key: "id", header: "Review ID", value: (r: any) => r.Id, numeric: true },
+              { key: "status", header: "Status", value: (r: any) => r.Status, render: (r: any) => <span class="badge">{r.Status}</span> },
+              { key: "req", header: "Request", value: (r: any) => r.EndpointWithParams },
+              { key: "by", header: "Submitted by", value: (r: any) => r.SubmitterAddress },
+              { key: "at", header: "Submitted", value: (r: any) => r.SubmissionTimeMs, render: (r: any) => formatTime(r.SubmissionTimeMs) },
+              { key: "reason", header: "Reason", value: (r: any) => r.Reason ?? "" },
+              { key: "act", header: "Actions", value: () => "", render: (r: any) => <Actions r={r} reload={res.reload} /> },
+            ]}
+          />
+        </div>
+      )}
+    </Async>
+  );
+}

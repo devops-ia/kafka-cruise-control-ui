@@ -1,0 +1,48 @@
+name: Lint and Test Go
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Go test and vet
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          # go.mod says 1.26.0, which setup-go takes as that exact patch, so govulncheck reported every stdlib fix since.
+          # "1.26" plus check-latest installs the newest 1.26.x, like golang:1.26-alpine in the Dockerfile. Move it with them.
+          go-version: "1.26"
+          check-latest: true
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test -race ./...
+
+  govulncheck:
+    name: govulncheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          # go.mod says 1.26.0, which setup-go takes as that exact patch, so govulncheck reported every stdlib fix since.
+          # "1.26" plus check-latest installs the newest 1.26.x, like golang:1.26-alpine in the Dockerfile. Move it with them.
+          go-version: "1.26"
+          check-latest: true
+
+      - name: Check dependencies for known vulnerabilities
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...

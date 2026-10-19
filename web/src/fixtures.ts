@@ -1,0 +1,54 @@
+// Shapes follow Cruise Control 3.x responses (yaml/responses in the CC source).
+export const load = {
+  version: 1,
+  brokers: [
+    { Broker: 0, Host: "kafka-0", Rack: "r1", BrokerState: "ALIVE", CpuPct: 12.5, DiskPct: 40, DiskMB: 1024, LeaderNwInRate: 100, FollowerNwInRate: 50, NwOutRate: 300, Replicas: 120, Leaders: 40 },
+    { Broker: 1, Host: "kafka-1", Rack: "r2", BrokerState: "ALIVE", CpuPct: 75, DiskPct: 91, DiskMB: 5120, LeaderNwInRate: 200, FollowerNwInRate: 80, NwOutRate: 400, Replicas: 80, Leaders: 30 },
+  ],
+  hosts: [{ Host: "kafka-0", Rack: "r1", CpuPct: 12.5, DiskPct: 40, DiskMB: 1024, LeaderNwInRate: 100, FollowerNwInRate: 50, NwOutRate: 300, Replicas: 120, Leaders: 40 }],
+};
+
+export const clusterState = {
+  version: 1,
+  KafkaBrokerState: {
+    Summary: { Brokers: 2, Topics: 5, Replicas: 200, Leaders: 70 },
+    LeaderCountByBrokerId: { "0": 40, "1": 30 },
+    ReplicaCountByBrokerId: { "0": 120, "1": 80 },
+    OutOfSyncCountByBrokerId: { "0": 0, "1": 2 },
+    OfflineReplicaCountByBrokerId: { "0": 0, "1": 0 },
+    IsController: { "0": true, "1": false },
+    OfflineLogDirsByBrokerId: { "0": [], "1": [] },
+  },
+  KafkaPartitionState: { offline: [], urp: [{ topic: "orders", partition: 3, leader: 0, replicas: [0, 1], "in-sync": [0], "out-of-sync": [1] }], "with-offline-replicas": [], "under-min-isr": [], other: [] },
+};
+
+export const ccState = {
+  version: 1,
+  MonitorState: { state: "RUNNING", numValidPartitions: 100 },
+  ExecutorState: { state: "NO_TASK_IN_PROGRESS" },
+  AnalyzerState: {
+    isProposalReady: true,
+    readyGoals: ["RackAwareGoal", "DiskCapacityGoal", "MyCustomGoal"],
+    goalReadiness: [
+      { name: "RackAwareGoal", status: "ready" },
+      { name: "DiskCapacityGoal", status: "ready" },
+      { name: "ReplicaDistributionGoal", status: "notReady" },
+      { name: "MyCustomGoal", status: "ready" },
+    ],
+  },
+  AnomalyDetectorState: { selfHealingEnabled: ["BROKER_FAILURE"], balancednessScore: 97.5 },
+};
+
+export const optimization = {
+  version: 1,
+  summary: { numReplicaMovements: 12, dataToMoveMB: 2048, numLeaderMovements: 3, numIntraBrokerReplicaMovements: 0, onDemandBalancednessScoreBefore: 80, onDemandBalancednessScoreAfter: 95 },
+  goalSummary: [{ goal: "RackAwareGoal", status: "NO-ACTION" }, { goal: "DiskUsageDistributionGoal", status: "VIOLATED" }],
+};
+
+export const userTasks = {
+  version: 1,
+  userTasks: [
+    { UserTaskId: "t-1", RequestURL: "POST /kafkacruisecontrol/rebalance?dryrun=true", ClientIdentity: "10.0.0.1", StartMs: 1760000000000, Status: "Completed" },
+    { UserTaskId: "t-2", RequestURL: "GET /kafkacruisecontrol/state", ClientIdentity: "10.0.0.2", StartMs: 1760000100000, Status: "Active" },
+  ],
+};
