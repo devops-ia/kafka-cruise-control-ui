@@ -2,11 +2,10 @@ import { useRef, useState } from "preact/hooks";
 import { ConfirmDialog } from "../components/Dialog";
 import { useGoals } from "../goals";
 import { buildParams, OPERATIONS, type Field, type Operation, type Values } from "../ops";
-import { atLeast, useSession } from "../session";
 import { cluster as clusterStore, useStore } from "../store";
 import { runTask } from "../tasks";
 
-function GoalPicker({ value, onChange, disabled }: { value: string; onChange: (v: string) => void; disabled: boolean }) {
+function GoalPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const { goals, error } = useGoals();
   const chosen = new Set(value.split(",").filter(Boolean));
   const toggle = (g: string) => {
@@ -20,7 +19,7 @@ function GoalPicker({ value, onChange, disabled }: { value: string; onChange: (v
   return (
     <div class="goal-groups">
       {(["hard", "soft"] as const).map((g) => (
-        <fieldset key={g} disabled={disabled}>
+        <fieldset key={g}>
           <legend>{g === "hard" ? "Hard goals" : "Soft goals"}</legend>
           {goals[g].length === 0 && <span class="muted">None</span>}
           {goals[g].map((name) => (
@@ -34,13 +33,13 @@ function GoalPicker({ value, onChange, disabled }: { value: string; onChange: (v
   );
 }
 
-function FieldInput({ f, values, set, disabled }: { f: Field; values: Values; set: (name: string, v: string | boolean) => void; disabled: boolean }) {
+function FieldInput({ f, values, set }: { f: Field; values: Values; set: (name: string, v: string | boolean) => void }) {
   const id = `f-${f.name}`;
   if (f.kind === "goals") {
     return (
       <div class="field">
         <span class="label">{f.label}</span>
-        <GoalPicker value={String(values[f.name] ?? "")} onChange={(v) => set(f.name, v)} disabled={disabled} />
+        <GoalPicker value={String(values[f.name] ?? "")} onChange={(v) => set(f.name, v)} />
         {f.help && <small class="muted">{f.help}</small>}
       </div>
     );
@@ -48,7 +47,7 @@ function FieldInput({ f, values, set, disabled }: { f: Field; values: Values; se
   if (f.kind === "bool") {
     return (
       <label class="check field">
-        <input type="checkbox" name={f.name} checked={values[f.name] === true} disabled={disabled} onChange={(e) => set(f.name, (e.target as HTMLInputElement).checked)} /> {f.label}
+        <input type="checkbox" name={f.name} checked={values[f.name] === true} onChange={(e) => set(f.name, (e.target as HTMLInputElement).checked)} /> {f.label}
       </label>
     );
   }
@@ -56,7 +55,6 @@ function FieldInput({ f, values, set, disabled }: { f: Field; values: Values; se
     id,
     name: f.name,
     required: f.required,
-    disabled,
     value: String(values[f.name] ?? ""),
     "aria-describedby": f.help ? `${id}-help` : undefined,
     onInput: (e: Event) => set(f.name, (e.target as HTMLInputElement).value),
@@ -78,17 +76,11 @@ function FieldInput({ f, values, set, disabled }: { f: Field; values: Values; se
 }
 
 function OperationForm({ op }: { op: Operation }) {
-  const session = useSession();
   const cluster = useStore(clusterStore);
   const [values, setValues] = useState<Values>({});
   const [confirming, setConfirming] = useState(false);
   const form = useRef<HTMLFormElement>(null);
 
-  const canSimulate = atLeast(session, "operator");
-  const canExecute = atLeast(session, "admin");
-  // Operations without a dry-run need the same role as a real execution.
-  const mayRun = (execute: boolean) => (op.dryRunnable && !execute ? canSimulate : canExecute);
-  const reason = !canSimulate ? `Your role (${session?.role ?? "unknown"}) cannot run operations.` : !canExecute ? "Executing needs the admin role; you can still simulate." : "";
   const set = (name: string, v: string | boolean) => setValues((s) => ({ ...s, [name]: v }));
 
   const run = (dryrun: boolean | undefined) => {
@@ -96,27 +88,21 @@ function OperationForm({ op }: { op: Operation }) {
     void runTask(cluster, op.endpoint, buildParams(op, values, dryrun));
   };
   const execute = () => (op.confirm ? setConfirming(true) : run(op.dryRunnable ? false : undefined));
-  const allDisabled = !canSimulate;
 
   return (
     <form ref={form} class="stack op-form" onSubmit={(e) => e.preventDefault()} aria-labelledby="op-title">
       <h2 id="op-title">{op.title}</h2>
       <p>{op.description}</p>
-      {reason && (
-        <p id="op-reason" class="state warn" role="note">
-          {reason}
-        </p>
-      )}
       {op.fields.map((f) => (
-        <FieldInput key={f.name} f={f} values={values} set={set} disabled={allDisabled} />
+        <FieldInput key={f.name} f={f} values={values} set={set} />
       ))}
       <div class="actions">
         {op.dryRunnable && (
-          <button type="button" disabled={!mayRun(false)} aria-describedby={reason ? "op-reason" : undefined} onClick={() => run(true)}>
+          <button type="button" onClick={() => run(true)}>
             Simulate
           </button>
         )}
-        <button type="button" class="danger" disabled={!mayRun(true)} aria-describedby={reason ? "op-reason" : undefined} onClick={execute}>
+        <button type="button" class="danger" onClick={execute}>
           {op.dryRunnable ? "Execute" : "Apply"}
         </button>
       </div>

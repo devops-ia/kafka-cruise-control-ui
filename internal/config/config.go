@@ -40,31 +40,34 @@ type OIDCProvider struct {
 	Name, Issuer, ClientID, ClientSecret, RedirectURL string
 	Scopes                                            []string
 	GroupsClaim                                       string
-	AdminGroups, OperatorGroups, ViewerGroups         []string
+	AdminGroups, ViewerGroups                         []string
 	DefaultRole                                       string // "" denies users without a mapped group
 }
 
+// LocalUser is a user of CCUI_AUTH_MODE=local. Role is "viewer" or "admin".
+type LocalUser struct{ Name, Hash, Role string }
+
 type Config struct {
-	AuthMode             string // none, local, oidc
-	Listen               string
-	TLSCert, TLSKey      string
-	PublicURL            string
-	SessionKey           string
-	LocalUser, LocalHash string
-	CookieInsecure       bool
-	TrustXFF             bool
-	IdleTimeout, MaxAge  time.Duration
-	LoginMaxAttempts     int
-	LoginWindow          time.Duration
-	MaxBodyBytes         int64
-	Clusters             []Cluster
-	OIDC                 []OIDCProvider
+	AuthMode            string // none, local, oidc
+	Listen              string
+	TLSCert, TLSKey     string
+	PublicURL           string
+	SessionKey          string
+	LocalUsers          []LocalUser
+	CookieInsecure      bool
+	TrustXFF            bool
+	IdleTimeout, MaxAge time.Duration
+	LoginMaxAttempts    int
+	LoginWindow         time.Duration
+	MaxBodyBytes        int64
+	Clusters            []Cluster
+	OIDC                []OIDCProvider
 }
 
 func (c *Config) TLSEnabled() bool { return c.TLSCert != "" }
 
 var (
-	indexed  = regexp.MustCompile(`^CCUI_(CLUSTERS|OIDC)__(\d+)__([A-Z0-9_]+)$`)
+	indexed  = regexp.MustCompile(`^CCUI_(CLUSTERS|OIDC|LOCAL_USERS)__(\d+)__([A-Z0-9_]+)$`)
 	nameRe   = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
 	provName = regexp.MustCompile(`^[a-z0-9-]+$`)
 )
@@ -195,15 +198,7 @@ func Load(env map[string]string) (*Config, error) {
 	if c.AuthMode != "none" && len(c.SessionKey) < 32 {
 		l.fail("CCUI_SESSION_SECRET", "required with CCUI_AUTH_MODE=%s, at least 32 characters (or CCUI_SESSION_SECRET_FILE)", c.AuthMode)
 	}
-	c.LocalUser = orDefault(l.g("CCUI_LOCAL_ADMIN_USER"), "admin")
-	c.LocalHash = l.gs("CCUI_LOCAL_ADMIN_PASSWORD_HASH")
-	if c.AuthMode == "local" {
-		if c.LocalHash == "" {
-			l.fail("CCUI_LOCAL_ADMIN_PASSWORD_HASH", "required with CCUI_AUTH_MODE=local")
-		} else if err := passwd.ValidateHash(c.LocalHash); err != nil {
-			l.fail("CCUI_LOCAL_ADMIN_PASSWORD_HASH", "%v", err)
-		}
-	}
+	c.LocalUsers = l.localUsers(c.AuthMode == "local")
 
 	n := l.indices("CLUSTERS")
 	if n == 0 {
@@ -250,6 +245,48 @@ func Load(env map[string]string) (*Config, error) {
 		return nil, errors.Join(l.errs...)
 	}
 	return c, nil
+}
+
+// localUsers reads CCUI_LOCAL_USERS__<n>__* plus the CCUI_LOCAL_ADMIN_* shortcut. Hashes are checked only in local mode.
+func (l *loader) localUsers(required bool) []LocalUser {
+	var users []LocalUser
+	names := map[string]bool{}
+	add := func(nameVar, hashVar, name, hash, role string) {
+		if names[name] {
+			l.fail(nameVar, "duplicate local user name %q", name)
+		}
+		names[name] = true
+		if required {
+			if hash == "" {
+				l.fail(hashVar, "required with CCUI_AUTH_MODE=local")
+			} else if err := passwd.ValidateHash(hash); err != nil {
+				l.fail(hashVar, "%v", err)
+			}
+		}
+		users = append(users, LocalUser{name, hash, role})
+	}
+	n := l.indices("LOCAL_USERS")
+	for i := 0; i < n; i++ {
+		p := fmt.Sprintf("CCUI_LOCAL_USERS__%d__", i)
+		lu := func(f string) string { return l.get(p + f) }
+		lus := func(f string) string { return l.secret(p + f) }
+		name, hash, role := lu("NAME"), lus("PASSWORD_HASH"), lu("ROLE")
+		if name == "" {
+			l.fail(p+"NAME", "required")
+		}
+		if role != "viewer" && role != "admin" {
+			l.fail(p+"ROLE", "must be viewer or admin, got %q", role)
+		}
+		add(p+"NAME", p+"PASSWORD_HASH", name, hash, role)
+	}
+	hash := l.gs("CCUI_LOCAL_ADMIN_PASSWORD_HASH")
+	if user := l.g("CCUI_LOCAL_ADMIN_USER"); hash != "" || user != "" {
+		add("CCUI_LOCAL_ADMIN_USER", "CCUI_LOCAL_ADMIN_PASSWORD_HASH", orDefault(user, "admin"), hash, "admin")
+	}
+	if required && len(users) == 0 {
+		l.fail("CCUI_LOCAL_USERS__0__NAME", "CCUI_AUTH_MODE=local needs at least one local user (CCUI_LOCAL_USERS__<n>__* or CCUI_LOCAL_ADMIN_PASSWORD_HASH)")
+	}
+	return users
 }
 
 func (l *loader) cluster(i int) Cluster {
@@ -310,7 +347,7 @@ func (l *loader) provider(i int, publicURL string) OIDCProvider {
 	o := OIDCProvider{
 		Name: oi("NAME"), Issuer: oi("ISSUER"), ClientID: oi("CLIENT_ID"), ClientSecret: ois("CLIENT_SECRET"),
 		GroupsClaim: orDefault(oi("GROUPS_CLAIM"), "groups"), DefaultRole: oi("DEFAULT_ROLE"),
-		AdminGroups: split(oi("ADMIN_GROUPS")), OperatorGroups: split(oi("OPERATOR_GROUPS")), ViewerGroups: split(oi("VIEWER_GROUPS")),
+		AdminGroups: split(oi("ADMIN_GROUPS")), ViewerGroups: split(oi("VIEWER_GROUPS")),
 		Scopes: split(strings.ReplaceAll(orDefault(oi("SCOPES"), "openid profile email"), " ", ",")),
 	}
 	if !provName.MatchString(o.Name) {
@@ -321,8 +358,8 @@ func (l *loader) provider(i int, publicURL string) OIDCProvider {
 			l.fail(p+f, "required")
 		}
 	}
-	if r := o.DefaultRole; r != "" && r != "viewer" && r != "operator" && r != "admin" {
-		l.fail(p+"DEFAULT_ROLE", "must be viewer, operator or admin")
+	if r := o.DefaultRole; r != "" && r != "viewer" && r != "admin" {
+		l.fail(p+"DEFAULT_ROLE", "must be viewer or admin")
 	}
 	o.RedirectURL = oi("REDIRECT_URL")
 	if o.RedirectURL == "" && publicURL != "" {

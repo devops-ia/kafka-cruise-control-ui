@@ -44,24 +44,17 @@ func TestCheck(t *testing.T) {
 }
 
 func TestMinRole(t *testing.T) {
-	cases := []struct {
-		name, query string
-		want        auth.Role
-	}{
-		{"state", "", auth.Viewer},
-		{"rebalance", "dryrun=true", auth.Operator},
-		{"rebalance", "dryrun=false", auth.Admin},
-		{"topic_configuration", "dryrun=true", auth.Admin},
-		{"admin", "", auth.Admin},
-		{"review", "", auth.Admin},
-		{"stop_proposal_execution", "", auth.Admin},
-		{"pause_sampling", "", auth.Admin},
-		{"rightsize", "", auth.Operator},
-	}
-	for _, c := range cases {
-		ep, _ := Lookup(c.name)
-		if got := MinRole(c.name, ep, q(c.query)); got != c.want {
-			t.Errorf("%s?%s: got %v want %v", c.name, c.query, got, c.want)
+	viewer := map[string]bool{"kafka_cluster_state": true, "state": true, "load": true, "partition_load": true, "permissions": true}
+	for name := range table {
+		want := auth.Admin
+		if viewer[name] {
+			want = auth.Viewer
+		}
+		if got := MinRole(name); got != want {
+			t.Errorf("%s: got %v want %v", name, got, want)
+		}
+		if got := MinRole(name); got != auth.Viewer && got != auth.Admin {
+			t.Errorf("%s: role %v is neither viewer nor admin", name, got)
 		}
 	}
 }

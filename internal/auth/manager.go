@@ -186,10 +186,16 @@ func (m *Manager) login(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	// Both checks always run so the answer and the timing do not reveal which one failed.
-	userOK := subtle.ConstantTimeCompare([]byte(in.Username), []byte(m.cfg.LocalUser)) == 1
-	passOK := passwd.CheckPassword(m.cfg.LocalHash, in.Password)
-	if !userOK || !passOK {
+	// Every name is compared and a hash is always checked so the answer and the timing do not reveal which part failed.
+	hash := m.cfg.LocalUsers[0].Hash
+	var found *config.LocalUser
+	for i := range m.cfg.LocalUsers {
+		if u := &m.cfg.LocalUsers[i]; subtle.ConstantTimeCompare([]byte(in.Username), []byte(u.Name)) == 1 {
+			found, hash = u, u.Hash
+		}
+	}
+	passOK := passwd.CheckPassword(hash, in.Password)
+	if found == nil || !passOK {
 		m.limiter.fail(ipKey, now)
 		m.limiter.fail(userKey, now)
 		m.log.Warn("login failed", "ip", clientIP(r, m.cfg.TrustXFF)) // not the username: people paste passwords there
@@ -197,8 +203,9 @@ func (m *Manager) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	m.limiter.reset(userKey)
-	m.start(w, User{Name: m.cfg.LocalUser, Role: Admin})
-	writeJSON(w, http.StatusOK, map[string]string{"user": m.cfg.LocalUser, "role": Admin.String()})
+	role := ParseRole(found.Role)
+	m.start(w, User{Name: found.Name, Role: role})
+	writeJSON(w, http.StatusOK, map[string]string{"user": found.Name, "role": role.String()})
 }
 
 func (m *Manager) logout(w http.ResponseWriter, r *http.Request) {

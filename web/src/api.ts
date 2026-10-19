@@ -10,7 +10,7 @@ export class ApiError extends Error {
   }
 }
 
-export type Role = "viewer" | "operator" | "admin";
+export type Role = "viewer" | "admin";
 
 export interface Session {
   authenticated: boolean;

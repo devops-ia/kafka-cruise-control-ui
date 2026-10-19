@@ -116,21 +116,28 @@ func TestRejectedRequestsNeverReachCC(t *testing.T) {
 
 func TestRoleGate(t *testing.T) {
 	for _, c := range []struct {
-		role  auth.Role
-		query string
-		want  int
+		role         auth.Role
+		method, path string
+		want         int
 	}{
-		{auth.Viewer, "dryrun=true", 403},
-		{auth.Operator, "dryrun=true", 200},
-		{auth.Operator, "dryrun=false", 403},
-		{auth.Admin, "dryrun=false", 200},
+		{auth.Viewer, "GET", "load", 200},
+		{auth.Viewer, "GET", "state", 200},
+		{auth.Viewer, "GET", "user_tasks", 403},
+		{auth.Viewer, "GET", "proposals", 403},
+		{auth.Viewer, "GET", "review_board", 403},
+		{auth.Viewer, "POST", "rebalance?dryrun=true", 403},
+		{auth.Viewer, "POST", "state", 403},
+		{auth.Viewer, "GET", "unknown_endpoint", 404},
+		{auth.Admin, "GET", "user_tasks", 200},
+		{auth.Admin, "POST", "rebalance?dryrun=false", 200},
+		{auth.Admin, "GET", "unknown_endpoint", 404},
 	} {
 		f := newFixture(t, c.role, time.Second, ok)
-		if got := do(t, "POST", f.ui.URL+"/api/clusters/a/proxy/rebalance?"+c.query, nil).StatusCode; got != c.want {
-			t.Errorf("%v %s: %d, want %d", c.role, c.query, got, c.want)
+		if got := do(t, c.method, f.ui.URL+"/api/clusters/a/proxy/"+c.path, nil).StatusCode; got != c.want {
+			t.Errorf("%v %s %s: %d, want %d", c.role, c.method, c.path, got, c.want)
 		}
-		if (c.want == 403) != (f.hits.Load() == 0) {
-			t.Errorf("%v %s: CC hits %d", c.role, c.query, f.hits.Load())
+		if (c.want != 200) != (f.hits.Load() == 0) {
+			t.Errorf("%v %s %s: CC hits %d", c.role, c.method, c.path, f.hits.Load())
 		}
 	}
 }

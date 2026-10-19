@@ -10,7 +10,7 @@ What you get:
 - An Admin page for rebalance, preferred leader election, add, remove and demote broker, fix offline replicas, topic replication factor, self-healing and concurrency, sampling and stop execution. Every operation has a separate "Simulate" (`dryrun=true`) and "Execute" (`dryrun=false`) button, and real executions ask for confirmation.
 - A global panel for asynchronous operations (HTTP 202 and `User-Task-ID`) and a Peer review page for Cruise Control's two-step verification.
 - Light and dark themes, keyboard navigation, tables you can sort and filter, auto-refresh.
-- Login with a local admin or OIDC, roles (viewer, operator, admin), CSRF protection, a strict Content-Security-Policy and an audit log of every POST.
+- Login with a local admin or OIDC, roles (viewer, admin), CSRF protection, a strict Content-Security-Policy and an audit log of every POST.
 
 ## Quick start
 
@@ -50,12 +50,17 @@ Secrets (passwords, tokens, client secrets, the session secret) have no default.
 | `CCUI_TRUST_XFF` | no | `false` | `true` behind a reverse proxy that appends the client address |
 | `CCUI_MAX_BODY_BYTES` | no | `1048576` | `65536` |
 
-### Local admin (`CCUI_AUTH_MODE=local`)
+### Local users (`CCUI_AUTH_MODE=local`)
+
+Define one or more users with consecutive indexes from 0, or only the admin shortcut. At least one user is required. Names must be unique, also against the shortcut and against OIDC user names.
 
 | Variable | Required | Default | Example |
 | --- | --- | --- | --- |
+| `CCUI_LOCAL_USERS__<n>__NAME` | yes, per user | none | `ana` |
+| `CCUI_LOCAL_USERS__<n>__PASSWORD_HASH` | yes, per user | none | a bcrypt or argon2id hash; plain text is rejected |
+| `CCUI_LOCAL_USERS__<n>__ROLE` | yes, per user | none | `viewer` or `admin` |
 | `CCUI_LOCAL_ADMIN_USER` | no | `admin` | `ops` |
-| `CCUI_LOCAL_ADMIN_PASSWORD_HASH` | yes | none | a bcrypt or argon2id hash; plain text is rejected |
+| `CCUI_LOCAL_ADMIN_PASSWORD_HASH` | no | none | shortcut for one admin user |
 
 ### Clusters
 
@@ -93,11 +98,10 @@ One or more providers, numbered from 0. Any OpenID Connect provider that publish
 | `CCUI_OIDC__<n>__SCOPES` | no | `openid profile email` | `openid profile email groups` |
 | `CCUI_OIDC__<n>__GROUPS_CLAIM` | no | `groups` | `roles` |
 | `CCUI_OIDC__<n>__ADMIN_GROUPS` | no | none | `ccui-admins,platform` |
-| `CCUI_OIDC__<n>__OPERATOR_GROUPS` | no | none | `sre` |
 | `CCUI_OIDC__<n>__VIEWER_GROUPS` | no | none | `developers` |
 | `CCUI_OIDC__<n>__DEFAULT_ROLE` | no | none (access denied) | `viewer` |
 
-Every secret above also accepts the `_FILE` form, for example `CCUI_SESSION_SECRET_FILE`, `CCUI_LOCAL_ADMIN_PASSWORD_HASH_FILE`, `CCUI_CLUSTERS__0__AUTH_PASSWORD_FILE`, `CCUI_CLUSTERS__0__AUTH_TOKEN_FILE`, `CCUI_CLUSTERS__0__AUTH_OIDC_CLIENT_SECRET_FILE` and `CCUI_OIDC__0__CLIENT_SECRET_FILE`.
+Every secret above also accepts the `_FILE` form, for example `CCUI_SESSION_SECRET_FILE`, `CCUI_LOCAL_ADMIN_PASSWORD_HASH_FILE`, `CCUI_LOCAL_USERS__0__PASSWORD_HASH_FILE`, `CCUI_CLUSTERS__0__AUTH_PASSWORD_FILE`, `CCUI_CLUSTERS__0__AUTH_TOKEN_FILE`, `CCUI_CLUSTERS__0__AUTH_OIDC_CLIENT_SECRET_FILE` and `CCUI_OIDC__0__CLIENT_SECRET_FILE`.
 
 GitHub is an OAuth provider without OIDC discovery and is not supported directly. Put an OIDC broker such as Dex or Keycloak in front of it.
 
@@ -109,7 +113,7 @@ GitHub is an OAuth provider without OIDC discovery and is not supported directly
 | `local` | One admin account checked against a bcrypt or argon2id hash. |
 | `oidc` | Users sign in at an OpenID Connect provider. Their role comes from a groups claim. |
 
-Make a bcrypt hash for the local admin (the leading `:` and the newline are removed):
+Make a bcrypt hash for a local user (the leading `:` and the newline are removed):
 
 ```sh
 htpasswd -bnBC 12 "" 'your password' | tr -d ':\n'
@@ -135,11 +139,10 @@ State-changing requests need a CSRF token (from `GET /api/session`, sent as `X-C
 
 | Role | Can |
 | --- | --- |
-| `viewer` | Read everything (`GET`). |
-| `operator` | Also run dry-runs (`dryrun=true`). |
-| `admin` | Run any operation: executions, `admin`, `review`, `topic_configuration`, pause and resume sampling, stop execution. |
+| `viewer` | Overview and Load pages only: the endpoints `kafka_cluster_state`, `state`, `load`, `partition_load` and `permissions`. Anything else answers 403. |
+| `admin` | Everything: proposals, user tasks, peer review, dry-runs, executions, `admin`, `review`, `topic_configuration`, pause and resume sampling, stop execution. |
 
-The local admin and everyone in `none` mode are `admin`. With OIDC, the highest role whose groups match wins; a user who matches none gets `DEFAULT_ROLE`, or is refused when it is not set.
+Each local user has the role set in `CCUI_LOCAL_USERS__<n>__ROLE`; the `CCUI_LOCAL_ADMIN_*` shortcut and everyone in `none` mode are `admin`. With OIDC, `admin` wins over `viewer` when both group lists match; a user who matches none gets `DEFAULT_ROLE`, or is refused when it is not set.
 
 ## Talking to Cruise Control
 

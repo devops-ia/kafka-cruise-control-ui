@@ -157,6 +157,13 @@ func (m *Manager) oidcCallback(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusForbidden, map[string]string{"error": "your account has no role in this application"})
 		return
 	}
+	for _, u := range m.cfg.LocalUsers {
+		if u.Name == name {
+			m.log.Warn("audit", "event", "oidc_login_refused", "reason", "name collides with a local user", "provider", p.Name, "user", name)
+			writeJSON(w, http.StatusForbidden, map[string]string{"error": "this user name belongs to a local user"})
+			return
+		}
+	}
 	m.start(w, User{Name: name, Role: role, Token: raw})
 	http.Redirect(w, r, "/", http.StatusFound)
 }
@@ -189,8 +196,6 @@ func RoleFromClaims(p config.OIDCProvider, claims map[string]any) Role {
 	switch {
 	case has(p.AdminGroups):
 		return Admin
-	case has(p.OperatorGroups):
-		return Operator
 	case has(p.ViewerGroups):
 		return Viewer
 	}

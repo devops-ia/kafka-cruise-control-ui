@@ -1,4 +1,4 @@
-import { getSession, setUnauthorizedHandler, type Role, type Session } from "./api";
+import { getSession, setUnauthorizedHandler, type Session } from "./api";
 import { createStore, useStore } from "./store";
 
 export const session = createStore<Session | undefined>(undefined);
@@ -13,5 +13,4 @@ setUnauthorizedHandler(() => {
   refreshSession().catch(() => session.set({ authenticated: false, mode: "local" }));
 });
 
-const RANK: Record<Role, number> = { viewer: 1, operator: 2, admin: 3 };
-export const atLeast = (s: Session | undefined, role: Role): boolean => !!s?.role && RANK[s.role] >= RANK[role];
+export const isAdmin = (s: Session | undefined): boolean => s?.role === "admin";

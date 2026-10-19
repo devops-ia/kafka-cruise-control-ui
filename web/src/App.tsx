@@ -15,13 +15,15 @@ import { Proposals } from "./pages/Proposals";
 import { Summary } from "./pages/Summary";
 import { UserTasks } from "./pages/UserTasks";
 import { Link, navigate, path } from "./router";
-import { refreshSession, useSession } from "./session";
+import { isAdmin, refreshSession, useSession } from "./session";
 import { applyTheme, cluster as clusterStore, setCluster, setTheme, theme, useStore, type Theme } from "./store";
 
 interface Route {
   path: string;
   title: string;
   group: string;
+  /** Needs the admin role; a viewer only gets Overview and Load. */
+  admin?: boolean;
   view: () => ComponentChildren;
 }
 
@@ -32,10 +34,10 @@ export const ROUTES: Route[] = [
   { path: "/config", title: "Config insights", group: "Overview", view: () => <ConfigInsights /> },
   { path: "/load", title: "Load", group: "Load", view: () => <Load /> },
   { path: "/partition-load", title: "Partition load", group: "Load", view: () => <PartitionLoad /> },
-  { path: "/proposals", title: "Proposals", group: "Operations", view: () => <Proposals /> },
-  { path: "/admin", title: "Admin", group: "Operations", view: () => <Admin /> },
-  { path: "/review", title: "Peer review", group: "Operations", view: () => <PeerReview /> },
-  { path: "/tasks", title: "User tasks", group: "Tasks", view: () => <UserTasks /> },
+  { path: "/proposals", title: "Proposals", group: "Operations", admin: true, view: () => <Proposals /> },
+  { path: "/admin", title: "Admin", group: "Operations", admin: true, view: () => <Admin /> },
+  { path: "/review", title: "Peer review", group: "Operations", admin: true, view: () => <PeerReview /> },
+  { path: "/tasks", title: "User tasks", group: "Tasks", admin: true, view: () => <UserTasks /> },
 ];
 
 const GROUPS = ["Overview", "Load", "Operations", "Tasks"];
@@ -89,6 +91,20 @@ function ClusterSelect() {
   );
 }
 
+function Forbidden({ title }: { title: string }) {
+  const s = useSession();
+  return (
+    <section aria-labelledby="page-title">
+      <div class="page-head">
+        <h1 id="page-title">403 Forbidden</h1>
+      </div>
+      <p class="state error" role="alert">
+        Your role ({s?.role ?? "unknown"}) cannot open {title}. It needs the admin role.
+      </p>
+    </section>
+  );
+}
+
 function Shell({ children }: { children: ComponentChildren }) {
   const s = useSession();
   const current = useStore(path);
@@ -98,8 +114,32 @@ function Shell({ children }: { children: ComponentChildren }) {
       <a class="skip" href="#main">
         Skip to content
       </a>
+      <nav class="sidebar" aria-label="Main">
+        <div class="brand">
+          <span class="mark" aria-hidden="true" />
+          Cruise Control
+        </div>
+        {GROUPS.map((g) => ({ g, routes: ROUTES.filter((r) => r.group === g && (!r.admin || isAdmin(s))) }))
+          .filter(({ routes }) => routes.length > 0)
+          .map(({ g, routes }) => (
+            <div key={g}>
+              <h2>{g}</h2>
+              <ul>
+                {routes.map((r) => (
+                  <li key={r.path}>
+                    <Link href={r.path} aria-current={current === r.path ? "page" : undefined}>
+                      {r.title}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        <div class="who">
+          <span>{s?.user}</span> <span class="badge">{s?.role}</span>
+        </div>
+      </nav>
       <header class="topbar">
-        <span class="brand">Cruise Control</span>
         <ClusterSelect />
         <div class="spacer" />
         <label>
@@ -110,9 +150,6 @@ function Shell({ children }: { children: ComponentChildren }) {
             <option value="dark">Dark</option>
           </select>
         </label>
-        <span class="who">
-          {s?.user} <span class="badge">{s?.role}</span>
-        </span>
         {s?.mode !== "none" && (
           <button
             type="button"
@@ -125,22 +162,6 @@ function Shell({ children }: { children: ComponentChildren }) {
           </button>
         )}
       </header>
-      <nav class="sidebar" aria-label="Main">
-        {GROUPS.map((g) => (
-          <div key={g}>
-            <h2>{g}</h2>
-            <ul>
-              {ROUTES.filter((r) => r.group === g).map((r) => (
-                <li key={r.path}>
-                  <Link href={r.path} aria-current={current === r.path ? "page" : undefined}>
-                    {r.title}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
-      </nav>
       <main id="main" tabIndex={-1}>
         {children}
       </main>
@@ -170,6 +191,8 @@ export function App() {
   if (!s) return <p class="state" role="status">Loading...</p>;
   if (!s.authenticated) return <Login />;
   const route = ROUTES.find((r) => r.path === current);
-  return <Shell>{selected ? route?.view() : <p class="state" role="status">Loading clusters...</p>}</Shell>;
+  // The guard renders no view for a viewer, so no request for the page goes out; the server enforces the same rule.
+  const body = route?.admin && !isAdmin(s) ? <Forbidden title={route.title} /> : selected ? route?.view() : <p class="state" role="status">Loading clusters...</p>;
+  return <Shell>{body}</Shell>;
 }
 

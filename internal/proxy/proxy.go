@@ -127,13 +127,14 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				"dryrun", r.URL.Query().Get("dryrun"), "params", params, "status", sw.status)
 		}()
 	}
-	ep, code, msg := Check(name, r.Method, r.URL.Query())
-	if code != 0 {
-		WriteError(w, code, msg)
+	// The role gate comes before the method check so a viewer gets 403 for any POST; unknown endpoints still answer 404.
+	if _, known := Lookup(name); known && (u.Role < MinRole(name) || r.Method == http.MethodPost && u.Role < auth.Admin) {
+		WriteError(w, http.StatusForbidden, "your role does not allow this operation")
 		return
 	}
-	if u.Role < MinRole(name, ep, r.URL.Query()) {
-		WriteError(w, http.StatusForbidden, "your role does not allow this operation")
+	_, code, msg := Check(name, r.Method, r.URL.Query())
+	if code != 0 {
+		WriteError(w, code, msg)
 		return
 	}
 	if p.cluster.ForwardIdentity == "jwt" && u.Token == "" {

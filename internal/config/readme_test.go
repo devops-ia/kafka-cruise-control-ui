@@ -28,6 +28,8 @@ func variablesInCode(t *testing.T) (all, secrets map[string]bool) {
 	add(`\bgs\("(CCUI_[A-Z0-9_]+)"\)`, "", true)
 	add(`\bcl\("([A-Z0-9_]+)"\)`, "CCUI_CLUSTERS__<n>__", false)
 	add(`\bcls\("([A-Z0-9_]+)"\)`, "CCUI_CLUSTERS__<n>__", true)
+	add(`\blu\("([A-Z0-9_]+)"\)`, "CCUI_LOCAL_USERS__<n>__", false)
+	add(`\blus\("([A-Z0-9_]+)"\)`, "CCUI_LOCAL_USERS__<n>__", true)
 	add(`\boi\("([A-Z0-9_]+)"\)`, "CCUI_OIDC__<n>__", false)
 	add(`\bois\("([A-Z0-9_]+)"\)`, "CCUI_OIDC__<n>__", true)
 	if len(all) < 30 {

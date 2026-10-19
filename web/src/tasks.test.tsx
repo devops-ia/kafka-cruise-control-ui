@@ -102,11 +102,4 @@ describe("two-step verification", () => {
     expect(exec.query.get("review_id")).toBe("7");
     expect(exec.query.get("dryrun")).toBe("false");
   });
-
-  it("Peer review is read-only for non-admins", async () => {
-    session.set({ authenticated: true, mode: "local", user: "ana", role: "operator" });
-    mockFetch(() => ({ body: pending }));
-    render(<PeerReview />);
-    expect((await screen.findByRole("button", { name: "Approve" }) as HTMLButtonElement).disabled).toBe(true);
-  });
 });

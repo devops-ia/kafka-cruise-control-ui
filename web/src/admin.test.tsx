@@ -7,7 +7,7 @@ import { setCluster } from "./store";
 import { tasks } from "./tasks";
 import { mockFetch, proxyPath } from "./testutil";
 
-function setup(role: Role, cluster = "prod-b") {
+function setup(role: Role = "admin", cluster = "prod-b") {
   localStorage.clear();
   tasks.set([]);
   setCluster(cluster);
@@ -27,7 +27,7 @@ afterEach(() => {
 
 describe("Admin", () => {
   it("Simulate sends dryrun=true", async () => {
-    const calls = setup("admin");
+    const calls = setup();
     render(<Admin />);
     pick("Simulate");
     await vi.waitFor(() => expect(posts(calls)).toHaveLength(1));
@@ -37,7 +37,7 @@ describe("Admin", () => {
   });
 
   it("asks for confirmation naming the cluster, and Cancel sends nothing", () => {
-    const calls = setup("admin");
+    const calls = setup();
     render(<Admin />);
     pick("Execute");
     const dialog = screen.getByRole("alertdialog");
@@ -49,7 +49,7 @@ describe("Admin", () => {
   });
 
   it("Escape closes the dialog without a request", () => {
-    const calls = setup("admin");
+    const calls = setup();
     render(<Admin />);
     pick("Execute");
     fireEvent.keyDown(screen.getByRole("alertdialog"), { key: "Escape" });
@@ -58,7 +58,7 @@ describe("Admin", () => {
   });
 
   it("confirming sends dryrun=false", async () => {
-    const calls = setup("admin");
+    const calls = setup();
     render(<Admin />);
     pick("Execute");
     pick("Execute on prod-b");
@@ -67,7 +67,7 @@ describe("Admin", () => {
   });
 
   it("remove broker sends brokerid and throttle_removed_broker, and names the broker in the dialog", async () => {
-    const calls = setup("admin");
+    const calls = setup();
     render(<Admin />);
     pick("Remove broker");
     fireEvent.input(screen.getByLabelText(/Broker IDs/), { target: { value: "3" } });
@@ -82,7 +82,7 @@ describe("Admin", () => {
   });
 
   it("does not send an unfilled required field", () => {
-    const calls = setup("admin");
+    const calls = setup();
     render(<Admin />);
     pick("Remove broker");
     pick("Simulate");
@@ -90,7 +90,7 @@ describe("Admin", () => {
   });
 
   it("offers goals read from the cluster and sends the chosen one", async () => {
-    const calls = setup("admin");
+    const calls = setup();
     render(<Admin />);
     fireEvent.click(await screen.findByLabelText("MyCustomGoal"));
     pick("Simulate");
@@ -98,26 +98,8 @@ describe("Admin", () => {
     expect(posts(calls)[0].query.get("goals")).toBe("MyCustomGoal");
   });
 
-  it("viewer: forms are disabled with the reason and no POST goes out", () => {
-    const calls = setup("viewer");
-    render(<Admin />);
-    expect(screen.getByText(/Your role \(viewer\) cannot run operations/)).toBeTruthy();
-    expect((screen.getByRole("button", { name: "Simulate" }) as HTMLButtonElement).disabled).toBe(true);
-    expect((screen.getByRole("button", { name: "Execute" }) as HTMLButtonElement).disabled).toBe(true);
-    fireEvent.click(screen.getByRole("button", { name: "Execute" }));
-    expect(posts(calls)).toHaveLength(0);
-  });
-
-  it("operator: can simulate but not execute", () => {
-    setup("operator");
-    render(<Admin />);
-    expect((screen.getByRole("button", { name: "Simulate" }) as HTMLButtonElement).disabled).toBe(false);
-    expect((screen.getByRole("button", { name: "Execute" }) as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByText(/needs the admin role/)).toBeTruthy();
-  });
-
   it("operations without a dry-run send no dryrun parameter", async () => {
-    const calls = setup("admin");
+    const calls = setup();
     render(<Admin />);
     pick("Pause sampling");
     pick("Apply");

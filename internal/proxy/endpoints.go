@@ -54,17 +54,13 @@ func Check(name, method string, q url.Values) (Endpoint, int, string) {
 	return ep, 0, ""
 }
 
-// MinRole is the lowest role allowed to send this request.
-func MinRole(name string, ep Endpoint, q url.Values) auth.Role {
-	switch {
-	case ep.Method == http.MethodGet:
+// viewerEndpoints are the only ones a viewer may call (the Overview and Load pages); everything else needs admin.
+var viewerEndpoints = map[string]bool{"kafka_cluster_state": true, "state": true, "load": true, "partition_load": true, "permissions": true}
+
+// MinRole is the lowest role allowed to call this endpoint.
+func MinRole(name string) auth.Role {
+	if viewerEndpoints[name] {
 		return auth.Viewer
-	case name == "rightsize":
-		return auth.Operator
-	case name == "topic_configuration", !ep.Params["dryrun"]:
-		return auth.Admin
-	case q.Get("dryrun") == "true":
-		return auth.Operator
 	}
 	return auth.Admin
 }

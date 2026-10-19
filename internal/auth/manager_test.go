@@ -191,3 +191,21 @@ func (w testWriter) Write(p []byte) (int, error) {
 	w.t.Log(strings.TrimSpace(string(p)))
 	return len(p), nil
 }
+
+func TestSeveralLocalUsersKeepTheirRoles(t *testing.T) {
+	cfg := mustConfig(t, "CCUI_LOCAL_ADMIN_PASSWORD_HASH", "",
+		"CCUI_LOCAL_USERS__0__NAME", "ana", "CCUI_LOCAL_USERS__0__ROLE", "admin", "CCUI_LOCAL_USERS__0__PASSWORD_HASH", pwHash,
+		"CCUI_LOCAL_USERS__1__NAME", "leo", "CCUI_LOCAL_USERS__1__ROLE", "viewer", "CCUI_LOCAL_USERS__1__PASSWORD_HASH", pwHash)
+	for user, role := range map[string]string{"ana": "admin", "leo": "viewer"} {
+		r := newRig(t, cfg)
+		if resp := r.login(t, user, "pw"); resp.StatusCode != 200 {
+			t.Fatalf("%s login: %d", user, resp.StatusCode)
+		}
+		if _, body := r.send(t, "GET", "/api/session", ""); !strings.Contains(body, `"role":"`+role+`"`) {
+			t.Fatalf("%s session: %s", user, body)
+		}
+	}
+	if resp := newRig(t, cfg).login(t, "admin", "pw"); resp.StatusCode != 401 {
+		t.Fatalf("shortcut must be absent: %d", resp.StatusCode)
+	}
+}

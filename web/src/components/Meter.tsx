@@ -10,3 +10,9 @@ export function Meter(props: { value: number; label: string; max?: number }) {
     </span>
   );
 }
+
+/** Flat progress bar for a share of a whole; the caller prints the numbers next to it. */
+export function Progress(props: { label: string; value: number; total: number }) {
+  const pct = props.total > 0 ? Math.min(100, Math.round((props.value / props.total) * 100)) : 0;
+  return <progress class="bar" max={100} value={pct} aria-label={props.label} />;
+}

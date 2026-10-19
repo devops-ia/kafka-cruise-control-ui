@@ -73,4 +73,44 @@ describe("App", () => {
     fireEvent.change(screen.getByLabelText("Cluster"), { target: { value: "b" } });
     expect(localStorage.getItem("ccui.cluster")).toBe("b");
   });
+
+  const asRole = (role: "viewer" | "admin", mode = "local") => {
+    localStorage.clear();
+    setCluster("a");
+    return mockFetch((c) => {
+      if (c.path === "/api/session") return { body: { authenticated: true, mode, user: "leo", role, csrfToken: "t" } };
+      if (c.path === "/api/clusters") return { body: [{ name: "a" }] };
+      return { body: {} };
+    });
+  };
+  const links = async () => [...(await screen.findByRole("navigation", { name: "Main" })).querySelectorAll("a")].map((a) => a.textContent);
+
+  it("viewer sees only Overview and Load in the sidebar", async () => {
+    asRole("viewer");
+    navigate("/summary");
+    render(<App />);
+    const nav = await screen.findByRole("navigation", { name: "Main" });
+    expect([...nav.querySelectorAll("h2")].map((h) => h.textContent)).toEqual(["Overview", "Load"]);
+    expect(await links()).toEqual(["Summary", "Cluster state", "Cruise Control state", "Config insights", "Load", "Partition load"]);
+  });
+
+  it.each(["/tasks", "/proposals", "/admin", "/review"])("viewer on %s gets a 403 page and no request for it", async (page) => {
+    const calls = asRole("viewer");
+    navigate(page);
+    render(<App />);
+    expect(await screen.findByRole("heading", { name: "403 Forbidden" })).toBeTruthy();
+    await links();
+    expect(calls.filter((c) => /\/proxy\/(user_tasks|proposals|review_board)$/.test(c.path) || c.method === "POST")).toEqual([]);
+  });
+
+  it("admin sees the four groups, and mode none counts as admin", async () => {
+    asRole("admin");
+    navigate("/summary");
+    render(<App />);
+    expect((await links()).length).toBe(10);
+    cleanup();
+    asRole("admin", "none");
+    render(<App />);
+    expect((await links()).length).toBe(10);
+  });
 });

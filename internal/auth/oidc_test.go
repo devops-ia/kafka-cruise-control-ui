@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -96,7 +97,7 @@ func oidcRig(t *testing.T, idp *fakeIdP, extra ...string) *rig {
 	kv := append([]string{
 		"CCUI_AUTH_MODE", "oidc", "CCUI_PUBLIC_URL", "http://placeholder",
 		"CCUI_OIDC__0__NAME", "corp", "CCUI_OIDC__0__ISSUER", idp.URL, "CCUI_OIDC__0__CLIENT_ID", "client-id", "CCUI_OIDC__0__CLIENT_SECRET", "cs",
-		"CCUI_OIDC__0__ADMIN_GROUPS", "ops", "CCUI_OIDC__0__OPERATOR_GROUPS", "sre", "CCUI_OIDC__0__VIEWER_GROUPS", "dev",
+		"CCUI_OIDC__0__ADMIN_GROUPS", "ops", "CCUI_OIDC__0__VIEWER_GROUPS", "dev",
 	}, extra...)
 	cfg := mustConfig(t, kv...)
 	r := newRig(t, cfg)
@@ -192,7 +193,7 @@ func TestOIDCRoleMapping(t *testing.T) {
 		role   string // "" means access denied
 	}{
 		{"admin wins", []string{"dev", "ops"}, nil, "admin"},
-		{"operator", []string{"sre"}, nil, "operator"},
+		{"unmapped group", []string{"sre"}, nil, ""},
 		{"viewer", []string{"dev"}, nil, "viewer"},
 		{"no mapped group, no default", []string{"other"}, nil, ""},
 		{"no mapped group, default viewer", []string{"other"}, []string{"CCUI_OIDC__0__DEFAULT_ROLE", "viewer"}, "viewer"},
@@ -225,5 +226,21 @@ func TestUnknownProviderIs404(t *testing.T) {
 	resp.Body.Close()
 	if resp.StatusCode != 404 {
 		t.Fatalf("got %d", resp.StatusCode)
+	}
+}
+
+func TestOIDCNameCollidingWithLocalUserGetsNoSession(t *testing.T) {
+	idp := newFakeIdP(t)
+	r := oidcRig(t, idp, "CCUI_LOCAL_USERS__0__NAME", "ana", "CCUI_LOCAL_USERS__0__ROLE", "viewer", "CCUI_LOCAL_USERS__0__PASSWORD_HASH", pwHash)
+	var buf strings.Builder
+	r.m.log = slog.New(slog.NewTextHandler(&buf, nil))
+	if resp := r.browse(t, idp); resp.StatusCode != 403 {
+		t.Fatalf("callback: %d", resp.StatusCode)
+	}
+	if got, _ := r.send(t, "GET", "/api/whoami", ""); got.StatusCode != 401 {
+		t.Fatalf("session created: %d", got.StatusCode)
+	}
+	if !strings.Contains(buf.String(), "audit") || !strings.Contains(buf.String(), "user=ana") {
+		t.Fatalf("no audit line: %s", buf.String())
 	}
 }

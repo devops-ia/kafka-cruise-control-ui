@@ -40,6 +40,38 @@ func TestTwoClustersInOrder(t *testing.T) {
 	}
 }
 
+// localEnv is local mode with one valid admin, ana, in CCUI_LOCAL_USERS__0__*.
+func localEnv(kv ...string) map[string]string {
+	m := env("CCUI_AUTH_MODE", "local", "CCUI_SESSION_SECRET", strings.Repeat("s", 32), "CCUI_CLUSTERS__0__NAME", "a", "CCUI_CLUSTERS__0__URL", "http://x",
+		"CCUI_LOCAL_USERS__0__NAME", "ana", "CCUI_LOCAL_USERS__0__ROLE", "admin", "CCUI_LOCAL_USERS__0__PASSWORD_HASH", hash)
+	for i := 0; i < len(kv); i += 2 {
+		m[kv[i]] = kv[i+1]
+	}
+	return m
+}
+
+func TestLocalUsers(t *testing.T) {
+	f := filepath.Join(t.TempDir(), "h")
+	if err := os.WriteFile(f, []byte(hash+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	e := localEnv("CCUI_LOCAL_USERS__1__NAME", "leo", "CCUI_LOCAL_USERS__1__ROLE", "viewer", "CCUI_LOCAL_USERS__1__PASSWORD_HASH_FILE", f,
+		"CCUI_LOCAL_ADMIN_USER", "root", "CCUI_LOCAL_ADMIN_PASSWORD_HASH", hash)
+	c, err := Load(e)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []LocalUser{{"ana", hash, "admin"}, {"leo", hash, "viewer"}, {"root", hash, "admin"}}
+	if len(c.LocalUsers) != 3 || c.LocalUsers[0] != want[0] || c.LocalUsers[1] != want[1] || c.LocalUsers[2] != want[2] {
+		t.Fatalf("got %+v", c.LocalUsers)
+	}
+	var buf bytes.Buffer
+	c.Log(slog.New(slog.NewJSONHandler(&buf, nil)))
+	if strings.Contains(buf.String(), hash) {
+		t.Fatalf("log leaks a hash: %s", buf.String())
+	}
+}
+
 func TestInvalid(t *testing.T) {
 	base := func(kv ...string) map[string]string {
 		m := env("CCUI_CLUSTERS__0__NAME", "a", "CCUI_CLUSTERS__0__URL", "http://x:1/kafkacruisecontrol")
@@ -65,6 +97,14 @@ func TestInvalid(t *testing.T) {
 		{"bad forward", base("CCUI_CLUSTERS__0__AUTH_FORWARD_IDENTITY", "x"), "CCUI_CLUSTERS__0__AUTH_FORWARD_IDENTITY"},
 		{"bad timeout", base("CCUI_CLUSTERS__0__TIMEOUT", "soon"), "CCUI_CLUSTERS__0__TIMEOUT"},
 		{"bad mode", base("CCUI_AUTH_MODE", "ldap"), "CCUI_AUTH_MODE"},
+		{"no local users", base("CCUI_AUTH_MODE", "local", "CCUI_SESSION_SECRET", strings.Repeat("s", 32)), "at least one local user"},
+		{"user index gap", localEnv("CCUI_LOCAL_USERS__2__NAME", "z", "CCUI_LOCAL_USERS__2__ROLE", "viewer", "CCUI_LOCAL_USERS__2__PASSWORD_HASH", hash), "CCUI_LOCAL_USERS__1__"},
+		{"user role missing", localEnv("CCUI_LOCAL_USERS__1__NAME", "z", "CCUI_LOCAL_USERS__1__PASSWORD_HASH", hash), "CCUI_LOCAL_USERS__1__ROLE"},
+		{"user role operator", localEnv("CCUI_LOCAL_USERS__1__NAME", "z", "CCUI_LOCAL_USERS__1__ROLE", "operator", "CCUI_LOCAL_USERS__1__PASSWORD_HASH", hash), "CCUI_LOCAL_USERS__1__ROLE"},
+		{"user plaintext", localEnv("CCUI_LOCAL_USERS__1__NAME", "z", "CCUI_LOCAL_USERS__1__ROLE", "viewer", "CCUI_LOCAL_USERS__1__PASSWORD_HASH", "hunter2"), "CCUI_LOCAL_USERS__1__PASSWORD_HASH"},
+		{"duplicate local users", localEnv("CCUI_LOCAL_USERS__1__NAME", "ana", "CCUI_LOCAL_USERS__1__ROLE", "viewer", "CCUI_LOCAL_USERS__1__PASSWORD_HASH", hash), `duplicate local user name "ana"`},
+		{"duplicate with shortcut", localEnv("CCUI_LOCAL_ADMIN_USER", "ana", "CCUI_LOCAL_ADMIN_PASSWORD_HASH", hash), `duplicate local user name "ana"`},
+		{"default role operator", base("CCUI_OIDC__0__DEFAULT_ROLE", "operator"), "CCUI_OIDC__0__DEFAULT_ROLE"},
 		{"local needs hash", base("CCUI_AUTH_MODE", "local", "CCUI_SESSION_SECRET", strings.Repeat("s", 32)), "CCUI_LOCAL_ADMIN_PASSWORD_HASH"},
 		{"plaintext password", base("CCUI_AUTH_MODE", "local", "CCUI_SESSION_SECRET", strings.Repeat("s", 32), "CCUI_LOCAL_ADMIN_PASSWORD_HASH", "hunter2"), "CCUI_LOCAL_ADMIN_PASSWORD_HASH"},
 		{"local needs secret", base("CCUI_AUTH_MODE", "local", "CCUI_LOCAL_ADMIN_PASSWORD_HASH", hash), "CCUI_SESSION_SECRET"},
