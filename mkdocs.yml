@@ -47,6 +47,7 @@ nav:
   - Configuration:
       - Variables: CONFIGURATION.md
       - Authentication: AUTHENTICATION.md
+      - Examples: EXAMPLES.md
       - Clusters: CLUSTERS.md
   - Using the UI:
       - User guide: USER_GUIDE.md
