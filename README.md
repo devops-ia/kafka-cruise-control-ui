@@ -203,6 +203,8 @@ For SPA work, `cd web && npm run dev` starts Vite on port 5173 and proxies `/api
 
 `docker build -t kafka-cruise-control-ui .` runs the same three stages as CI: Node builds the SPA, Go builds the binary with the SPA embedded, and the result is copied into a distroless non-root image.
 
+The frozen LinkedIn UI can still be built locally with `docker build --target legacy`; see [Legacy UI](docs/DEPLOYMENT.md#legacy-ui).
+
 ## License
 
 See [LICENSE](LICENSE).

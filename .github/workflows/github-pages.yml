@@ -5,10 +5,6 @@ permissions: {}
 on:
   push:
     branches: [main]
-    paths:
-      - docs/**
-      - mkdocs.yml
-      - .github/workflows/github-pages.yml
   workflow_dispatch:
 
 concurrency:
