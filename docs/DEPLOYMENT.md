@@ -298,3 +298,29 @@ What was measured:
 | Resident memory of the binary, right after start with one cluster | 13 to 15 MB (`ps -o rss`, macOS arm64, not a container) |
 
 The server holds sessions, rate-limit counters and OIDC flows in memory, and streams Cruise Control responses without buffering them, except that SigV4 clusters buffer the request body to sign it. Expect memory to stay in the tens of megabytes. The requests and limits in the manifest above (10m CPU, 32Mi request, 128Mi limit) leave room and come from those numbers, not from a load test. Check your own usage with `kubectl top pod` after a week.
+
+## Legacy UI
+
+The LinkedIn `cruise-control-ui` is frozen. Nothing builds or publishes it any more; the `helm-cruise-control` chart still deploys the images that already exist:
+
+- `ghcr.io/devops-ia/kafka-cruise-control-ui:0.4.0`
+- `devopsiaci/cruise-control-ui:0.4.0`
+
+To build it yourself, use the `legacy` target of this repository's Dockerfile. It is a local build only. CI does not touch it, and a plain `docker build .` still gives the normal image.
+
+```sh
+docker build --target legacy -t cruise-control-ui-legacy .
+docker run --name ccui-legacy -p 8081:80 \
+  -v $(pwd)/config.csv:/usr/share/nginx/html/static/config.csv:ro \
+  cruise-control-ui-legacy
+```
+
+The `-v` line is optional. The image ships a `config.csv` with a single line, `local,local,/kafkacruisecontrol/`. A line is `<group>,<name>,<nginx path>`: the browser calls the nginx path, so your nginx has to proxy it to Cruise Control. The default nginx configuration in the image does not.
+
+The release comes from the `CC_UI_TAG` build argument (default `0.4.0`). The container runs nginx as user 101 and listens on port 80.
+
+The legacy UI has no login and no roles. Anyone who can reach it can run every operation, so do not expose it without another layer of protection. To move to the current UI, see [Migration from the legacy UI](MIGRATION.md).
+
+## Documentation site
+
+This site is published by the `Pages` workflow on every push to `main`. In the repository, Settings > Pages > Source must be GitHub Actions. With "Deploy from a branch", GitHub publishes the README through Jekyll and overwrites this site.

@@ -62,6 +62,19 @@ docker run --name cruise-control-ui -p 8080:8080 --env-file ccui.env \
 
 The `helm-cruise-control` chart renders `config.csv` and an nginx configuration from the `clusters` of its values for its `ui` block. For this UI, set `ui.image` to this image and move the cluster list into `ui.env`, as in the [Kubernetes example](DEPLOYMENT.md#with-the-helm-cruise-control-chart). The `clusters` values still define the Cruise Control deployments themselves.
 
+## Legacy UI
+
+If you cannot move yet, the legacy images stay available and frozen at `0.4.0`: `ghcr.io/devops-ia/kafka-cruise-control-ui:0.4.0` and `devopsiaci/cruise-control-ui:0.4.0`. Nothing builds or publishes them any more. Build it locally from this repository with:
+
+```sh
+docker build --target legacy -t cruise-control-ui-legacy .
+docker run --name ccui-legacy -p 8081:80 \
+  -v $(pwd)/config.csv:/usr/share/nginx/html/static/config.csv:ro \
+  cruise-control-ui-legacy
+```
+
+It reads `config.csv` with lines of `<group>,<name>,<nginx path>`, for example `local,local,/kafkacruisecontrol/`. It has no login and no roles. More in [Installation and deployment](DEPLOYMENT.md#legacy-ui).
+
 ## Things to know in the new UI
 
 - There is no way to add a cluster from the browser. Clusters are changed in the configuration and need a restart.
