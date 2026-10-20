@@ -121,6 +121,8 @@ The name shown in the UI and written to the audit log is the first non-empty of 
 !!! warning
     A user whose name equals a configured local user is refused with 403 `this user name belongs to a local user`, and a warning with `"event":"oidc_login_refused"` is logged. This stops an identity-provider account called `admin` from taking over the local `admin`. Rename the local user, or the account, so the names differ.
 
+Complete, copyable setups for each provider are in [Examples](EXAMPLES.md).
+
 ### Entra ID
 
 Register an application, add a Web redirect URI `https://cc.example.com/api/auth/entra/callback`, and create a client secret. Under Token configuration add a groups claim for security groups. The token then carries group object IDs, not names.
@@ -213,6 +215,27 @@ CCUI_OIDC__0__VIEWER_GROUPS=ccui-viewers
 CCUI_CLUSTERS__0__NAME=prod
 CCUI_CLUSTERS__0__URL=http://cc.kafka.svc:9090/kafkacruisecontrol
 ```
+
+### GitLab
+
+gitlab.com and self-managed GitLab are OpenID Connect providers, so they work without a broker. Create a confidential application with the scopes `openid`, `profile` and `email` and the redirect URI `https://cc.example.com/api/auth/gitlab/callback`. GitLab puts the groups in the `groups_direct` claim of the ID token, as group paths, and only the groups the user is a direct member of.
+
+```env
+CCUI_AUTH_MODE=oidc
+CCUI_PUBLIC_URL=https://cc.example.com
+CCUI_SESSION_SECRET=replace-with-at-least-32-random-characters
+CCUI_OIDC__0__NAME=gitlab
+CCUI_OIDC__0__ISSUER=https://gitlab.com
+CCUI_OIDC__0__CLIENT_ID=replace-me
+CCUI_OIDC__0__CLIENT_SECRET=replace-me
+CCUI_OIDC__0__GROUPS_CLAIM=groups_direct
+CCUI_OIDC__0__ADMIN_GROUPS=my-org/platform
+CCUI_OIDC__0__VIEWER_GROUPS=my-org
+CCUI_CLUSTERS__0__NAME=prod
+CCUI_CLUSTERS__0__URL=http://cc.kafka.svc:9090/kafkacruisecontrol
+```
+
+For a self-managed instance use its base URL as `ISSUER`. The step-by-step setup and the direct-membership caveat are in [Examples](EXAMPLES.md#gitlab).
 
 ### Any other provider
 
