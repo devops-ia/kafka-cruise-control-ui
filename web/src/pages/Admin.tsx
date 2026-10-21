@@ -53,6 +53,20 @@ function FieldInput({ f, values, set }: { f: Field; values: Values; set: (name: 
       </label>
     );
   }
+  if (f.kind === "select") {
+    return (
+      <div class="field">
+        <label for={id}>{f.label}</label>
+        <select id={id} name={f.name} value={String(values[f.name] ?? "")} onChange={(e) => set(f.name, (e.target as HTMLSelectElement).value)}>
+          {f.options!.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </div>
+    );
+  }
   const common = {
     id,
     name: f.name,

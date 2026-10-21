@@ -75,23 +75,26 @@ Each operation has its own tab. The form shows a title, a description, the param
 
 | Tab | Cruise Control endpoint | Notes |
 | --- | --- | --- |
-| Rebalance | `rebalance` | Goals, concurrency, excluded topics, replication throttle, reason. |
+| Rebalance | `rebalance` | Goals, concurrency, excluded topics, replication throttle, reason, plus the common options below, Kafka assigner mode and destination broker IDs. |
 | Preferred leader election | `rebalance` | Sends `goals=PreferredLeaderElectionGoal`. Moves leadership without moving data. |
-| Add broker | `add_broker` | Broker IDs are required. |
-| Remove broker | `remove_broker` | Broker IDs are required. |
-| Demote broker | `demote_broker` | Broker IDs are required. |
-| Fix offline replicas | `fix_offline_replicas` | |
-| Topic replication factor | `topic_configuration` | Topic (regex) and replication factor are required. |
-| Self-healing and concurrency | `admin` | Enable or disable self-healing for anomaly types, change concurrency. |
+| Rebalance disks | `rebalance` | Sends `rebalance_disk=true`. Moves replicas between the disks of a broker, with no goals. |
+| Add broker | `add_broker` | Broker IDs are required. Common options and Kafka assigner mode. |
+| Remove broker | `remove_broker` | Broker IDs are required. Common options, Kafka assigner mode and destination broker IDs. |
+| Demote broker | `demote_broker` | Broker IDs are required. Replication throttle and Disallow capacity estimation. |
+| Fix offline replicas | `fix_offline_replicas` | Common options. |
+| Topic replication factor | `topic_configuration` | Topic (regex) and replication factor are required. Common options, skip rack awareness check, skip hard goal check, concurrency and replication throttle. |
+| Self-healing and concurrency | `admin` | Enable or disable self-healing for anomaly types, change concurrency, max partition movements in cluster, intra-broker concurrency and execution progress check interval. |
 | Pause sampling | `pause_sampling` | |
 | Resume sampling | `resume_sampling` | |
 | Stop execution | `stop_proposal_execution` | Optional force stop. |
+
+The common options are "Disallow capacity estimation", "Use ready default goals" and "Data from" (Cruise Control default, valid windows or valid partitions). "Disallow capacity estimation" sends `allow_capacity_estimation=false` when checked and nothing when not. Each option appears only on the operations whose Cruise Control endpoint accepts it. There is no `replication_logdir_throttle` field: Cruise Control does not implement it and the proxy refuses it.
 
 The optional "Goals" section is a closed "Goals, optional" block with hard and soft goals side by side. The goals come from the analyzer state of the selected cluster. Leave all unchecked to use Cruise Control's default goals.
 
 ### Simulate and Execute
 
-Operations that change data (everything from Rebalance to Topic replication factor) have two buttons.
+Operations that change data (everything from Rebalance to Topic replication factor, including Rebalance disks) have two buttons.
 
 - **Simulate** sends `dryrun=true`. Cruise Control computes the result and changes nothing. Use it first.
 - **Execute** sends `dryrun=false` after a confirmation dialog that names the operation and the cluster. It starts the real movement.

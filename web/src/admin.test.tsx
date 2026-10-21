@@ -109,6 +109,31 @@ describe("Admin", () => {
     expect(posts(calls)[0].query.has("dryrun")).toBe(false);
   });
 
+  it("Rebalance disks simulates and asks for confirmation before executing", async () => {
+    const calls = setup();
+    render(<Admin />);
+    tab("Rebalance disks");
+    pick("Simulate");
+    await vi.waitFor(() => expect(posts(calls)).toHaveLength(1));
+    expect(posts(calls)[0].path).toBe(proxyPath("prod-b", "rebalance"));
+    expect([posts(calls)[0].query.get("rebalance_disk"), posts(calls)[0].query.get("dryrun")]).toEqual(["true", "true"]);
+    pick("Execute");
+    expect(screen.getByRole("alertdialog").textContent).toContain("prod-b");
+    expect(posts(calls)).toHaveLength(1);
+    pick("Execute on prod-b");
+    await vi.waitFor(() => expect(posts(calls)).toHaveLength(2));
+    expect(posts(calls)[1].query.get("dryrun")).toBe("false");
+  });
+
+  it("data_from is a labelled select that is sent when chosen", async () => {
+    const calls = setup();
+    render(<Admin />);
+    fireEvent.change(screen.getByLabelText("Data from"), { target: { value: "valid_partitions" } });
+    pick("Simulate");
+    await vi.waitFor(() => expect(posts(calls)).toHaveLength(1));
+    expect(posts(calls)[0].query.get("data_from")).toBe("valid_partitions");
+  });
+
   it("is a horizontal tab bar wired to one labelled tabpanel", () => {
     setup();
     render(<Admin />);
