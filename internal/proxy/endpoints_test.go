@@ -34,11 +34,28 @@ func TestCheck(t *testing.T) {
 		{"state", "GET", "doAs=root", http.StatusBadRequest, "doAs"},
 		{"state", "GET", "json=false", http.StatusBadRequest, "json"},
 		{"pause_sampling", "POST", "reason=x", 0, ""}, // no dryrun param exists for it
+		{"load", "GET", "populate_disk_info=true&allow_capacity_estimation=false", 0, ""},
+		{"partition_load", "GET", "topic=orders.*&resource=disk&entries=100", 0, ""},
+		{"rebalance", "POST", "dryrun=true&destination_broker_ids=1,2&data_from=valid_windows&kafka_assigner=true&use_ready_default_goals=true&allow_capacity_estimation=false", 0, ""},
+		{"rebalance", "POST", "rebalance_disk=true&dryrun=true", 0, ""},
+		{"remove_disks", "POST", "brokerid_and_logdirs=0-/data/a&dryrun=true", 0, ""},
+		{"topic_configuration", "POST", "dryrun=true&skip_rack_awareness_check=true", 0, ""},
+		{"admin", "POST", "max_partition_movements_in_cluster=5&concurrent_intra_broker_partition_movements=2&execution_progress_check_interval_ms=1000", 0, ""},
+		{"rebalance", "POST", "dryrun=true&replication_logdir_throttle=1", http.StatusBadRequest, "replication_logdir_throttle"},
+		{"topic_configuration", "POST", "dryrun=true&replication_logdir_throttle=1", http.StatusBadRequest, "replication_logdir_throttle"},
 	}
 	for _, c := range cases {
 		_, got, msg := Check(c.name, c.method, q(c.query))
 		if got != c.want || !strings.Contains(msg, c.msg) {
 			t.Errorf("%s %s?%s: got %d %q, want %d containing %q", c.method, c.name, c.query, got, msg, c.want, c.msg)
+		}
+	}
+}
+
+func TestFormEndpointsRoles(t *testing.T) {
+	for name, want := range map[string]auth.Role{"load": auth.Viewer, "partition_load": auth.Viewer, "rebalance": auth.Admin, "remove_disks": auth.Admin} {
+		if got := MinRole(name); got != want {
+			t.Errorf("%s: got %v want %v", name, got, want)
 		}
 	}
 }

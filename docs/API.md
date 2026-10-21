@@ -92,6 +92,8 @@ curl -si -b jar -X POST -H "Origin: $H" -H "X-CSRF-Token: $TOKEN" \
   "$H/api/clusters/local/proxy/rebalance?dryrun=true"
 ```
 
+The Admin forms send these parameters, all already in the allow-list: to `rebalance`, `destination_broker_ids`, `data_from`, `kafka_assigner`, `use_ready_default_goals`, `allow_capacity_estimation` and `rebalance_disk`; to `topic_configuration`, `skip_rack_awareness_check`; to `admin`, `max_partition_movements_in_cluster`, `concurrent_intra_broker_partition_movements` and `execution_progress_check_interval_ms`. `replication_logdir_throttle` is refused with 400 on every endpoint.
+
 If Cruise Control answers 202, repeat the same request with `-H "User-Task-ID: <value of the header you got>"` until the status changes.
 
 | Status | Body or cause |
