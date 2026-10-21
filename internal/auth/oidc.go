@@ -110,7 +110,8 @@ func (m *Manager) oidcCallback(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "unknown provider"})
 		return
 	}
-	http.SetCookie(w, &http.Cookie{Name: stateCookie, Value: "", Path: "/api/auth/", MaxAge: -1})
+	http.SetCookie(w, &http.Cookie{Name: stateCookie, Value: "", Path: "/api/auth/", MaxAge: -1,
+		HttpOnly: true, Secure: !m.cfg.CookieInsecure, SameSite: http.SameSiteLaxMode})
 
 	state := r.URL.Query().Get("state")
 	ck, err := r.Cookie(stateCookie)

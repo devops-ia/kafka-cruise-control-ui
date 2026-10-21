@@ -2,6 +2,7 @@ package auth
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"strconv"
 	"strings"
 	"testing"
@@ -65,5 +66,18 @@ func TestXFFIgnoredUnlessTrusted(t *testing.T) {
 	}
 	if got := r.loginFrom(t, "10.0.0.9", "u9", "x").StatusCode; got != 429 {
 		t.Fatalf("spoofed X-Forwarded-For escaped the per-IP limit: %d", got)
+	}
+}
+
+func TestClientIPIgnoresXFFThatIsNotAnAddress(t *testing.T) {
+	req := httptest.NewRequest("POST", "/api/login", nil)
+	req.RemoteAddr = "192.0.2.7:5555"
+	req.Header.Set("X-Forwarded-For", "10.0.0.1, evil\nforged line")
+	if got := clientIP(req, true); got != "192.0.2.7" {
+		t.Fatalf("got %q", got)
+	}
+	req.Header.Set("X-Forwarded-For", "203.0.113.9")
+	if got := clientIP(req, true); got != "203.0.113.9" {
+		t.Fatalf("got %q", got)
 	}
 }
