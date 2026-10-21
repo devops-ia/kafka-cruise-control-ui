@@ -261,3 +261,24 @@ func TestAuditLineForPOST(t *testing.T) {
 		t.Fatalf("audit leaks credentials: %s", buf.String())
 	}
 }
+
+func TestAuditParamsStayOnOneLine(t *testing.T) {
+	var buf bytes.Buffer
+	cc := httptest.NewServer(http.HandlerFunc(ok))
+	defer cc.Close()
+	u, _ := url.Parse(cc.URL + "/kafkacruisecontrol")
+	p := New(config.Cluster{Name: "a", URL: u, Timeout: time.Second}, http.DefaultTransport, slog.New(slog.NewJSONHandler(&buf, nil)), 1024)
+	mux := http.NewServeMux()
+	mux.Handle("/api/clusters/{name}/proxy/{endpoint}", p)
+	req := httptest.NewRequest("POST", "/api/clusters/a/proxy/rebalance?dryrun=true&reason=a%0Ab%0Dc", nil)
+	req = req.WithContext(auth.WithUser(req.Context(), auth.User{Name: "ana", Role: auth.Admin}))
+	mux.ServeHTTP(httptest.NewRecorder(), req)
+
+	var line struct{ Params map[string]string }
+	if err := json.Unmarshal(buf.Bytes(), &line); err != nil {
+		t.Fatal(err)
+	}
+	if got := line.Params["reason"]; got != "a b c" {
+		t.Fatalf("reason logged as %q", got)
+	}
+}

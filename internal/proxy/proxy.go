@@ -111,6 +111,9 @@ func (s *statusWriter) WriteHeader(code int) {
 
 func (s *statusWriter) Unwrap() http.ResponseWriter { return s.ResponseWriter } // keeps Flush working
 
+// logSafe keeps a client-supplied value on one log line.
+var logSafe = strings.NewReplacer("\n", " ", "\r", " ")
+
 func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("endpoint")
 	u, _ := auth.UserFrom(r.Context())
@@ -121,7 +124,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			params := map[string]string{}
 			for k, v := range r.URL.Query() {
-				params[k] = strings.Join(v, ",")
+				params[k] = logSafe.Replace(strings.Join(v, ","))
 			}
 			p.audit.Info("audit", "user", u.Name, "role", u.Role.String(), "cluster", p.cluster.Name, "endpoint", name,
 				"dryrun", r.URL.Query().Get("dryrun"), "params", params, "status", sw.status)

@@ -3,6 +3,7 @@ package auth
 import (
 	"net"
 	"net/http"
+	"net/netip"
 	"strings"
 	"sync"
 	"time"
@@ -71,8 +72,9 @@ func (l *limiter) reset(key string) {
 func clientIP(r *http.Request, trustXFF bool) string {
 	if trustXFF {
 		parts := strings.Split(r.Header.Get("X-Forwarded-For"), ",")
-		if ip := strings.TrimSpace(parts[len(parts)-1]); ip != "" {
-			return ip
+		// Only a real address is accepted: the value ends up in logs and rate-limit keys.
+		if ip, err := netip.ParseAddr(strings.TrimSpace(parts[len(parts)-1])); err == nil {
+			return ip.String()
 		}
 	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)

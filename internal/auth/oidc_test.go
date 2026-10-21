@@ -244,3 +244,19 @@ func TestOIDCNameCollidingWithLocalUserGetsNoSession(t *testing.T) {
 		t.Fatalf("no audit line: %s", buf.String())
 	}
 }
+
+func TestOIDCStateCookieClearedWithSecureAttributes(t *testing.T) {
+	idp := newFakeIdP(t)
+	r := oidcRig(t, idp)
+	resp, _ := r.client.Get(r.srv.URL + "/api/auth/corp/callback?state=x")
+	resp.Body.Close()
+	for _, c := range resp.Cookies() {
+		if c.Name == stateCookie && c.MaxAge < 0 {
+			if !c.Secure || !c.HttpOnly || c.SameSite != http.SameSiteLaxMode {
+				t.Fatalf("clearing cookie is not Secure/HttpOnly/Lax: %+v", c)
+			}
+			return
+		}
+	}
+	t.Fatal("state cookie was not cleared")
+}
