@@ -1,13 +1,14 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/preact";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/preact";
 import type { Role } from "./api";
-import { ccState, optimization } from "./fixtures";
+import { ccState, clusterState, optimization } from "./fixtures";
 import { Admin } from "./pages/Admin";
 import { session } from "./session";
+import { act } from "@testing-library/preact";
 import { setCluster } from "./store";
 import { tasks } from "./tasks";
 import { mockFetch, proxyPath } from "./testutil";
 
-function setup(role: Role = "admin", cluster = "prod-b") {
+function setup(role: Role = "admin", cluster = "prod-b", kcs: object = clusterState) {
   localStorage.clear();
   tasks.set([]);
   setCluster(cluster);
@@ -15,6 +16,7 @@ function setup(role: Role = "admin", cluster = "prod-b") {
   return mockFetch((c) => {
     if (c.method === "POST") return { body: optimization };
     if (c.path.endsWith("/state")) return { body: ccState };
+    if (c.path.endsWith("/kafka_cluster_state")) return { body: kcs };
   });
 }
 const posts = (calls: ReturnType<typeof mockFetch>) => calls.filter((c) => c.method === "POST");
@@ -80,6 +82,74 @@ describe("Admin", () => {
     expect([q.get("brokerid"), q.get("throttle_removed_broker"), q.get("dryrun")]).toEqual(["3", "true", "true"]);
     pick("Execute");
     expect(screen.getByRole("alertdialog").textContent).toContain("3");
+  });
+
+  it("remove disks sends the chosen log dirs with dryrun=true and names them in the dialog", async () => {
+    const calls = setup();
+    render(<Admin />);
+    tab("Remove disks");
+    const d0 = within(await screen.findByRole("group", { name: "Broker 0" }));
+    const d1 = within(screen.getByRole("group", { name: "Broker 1" }));
+    fireEvent.click(d0.getByLabelText("/data/b"));
+    fireEvent.click(d1.getByLabelText("/data/a"));
+    pick("Simulate");
+    await vi.waitFor(() => expect(posts(calls)).toHaveLength(1));
+    const q = posts(calls)[0].query;
+    expect(posts(calls)[0].path).toBe(proxyPath("prod-b", "remove_disks"));
+    expect([q.get("brokerid_and_logdirs"), q.get("dryrun"), q.has("verbose")]).toEqual(["0-/data/b,1-/data/a", "true", false]);
+    pick("Execute");
+    const dialog = screen.getByRole("alertdialog").textContent!;
+    expect(dialog).toContain("prod-b");
+    expect(dialog).toContain("0-/data/b,1-/data/a");
+  });
+
+  it("a log dir path with a comma is disabled with a note and never sent", async () => {
+    const withComma = { ...clusterState, KafkaBrokerState: { ...clusterState.KafkaBrokerState, OnlineLogDirsByBrokerId: { 0: ["/data/a,b", "/data/c"] } } };
+    const calls = setup("admin", "prod-b", withComma);
+    render(<Admin />);
+    tab("Remove disks");
+    const g = within(await screen.findByRole("group", { name: "Broker 0" }));
+    const box = g.getByLabelText(/\/data\/a,b/) as HTMLInputElement;
+    expect(box.disabled).toBe(true);
+    expect(g.getByText(/path contains a comma, cannot be selected/)).toBeTruthy();
+    fireEvent.click(g.getByLabelText("/data/c"));
+    pick("Simulate");
+    await vi.waitFor(() => expect(posts(calls)).toHaveLength(1));
+    expect(posts(calls)[0].query.get("brokerid_and_logdirs")).toBe("0-/data/c");
+  });
+
+  it("a log dir selection made on one cluster does not survive switching cluster", async () => {
+    const calls = setup();
+    render(<Admin />);
+    tab("Remove disks");
+    fireEvent.click(within(await screen.findByRole("group", { name: "Broker 0" })).getByLabelText("/data/b"));
+    act(() => setCluster("prod-c"));
+    const box = within(await screen.findByRole("group", { name: "Broker 0" })).getByLabelText("/data/b") as HTMLInputElement;
+    expect(box.checked).toBe(false);
+    pick("Simulate");
+    expect(posts(calls)).toHaveLength(0);
+  });
+
+  it("remove disks without a selection sends nothing and says so", async () => {
+    const calls = setup();
+    render(<Admin />);
+    tab("Remove disks");
+    await screen.findByRole("group", { name: "Broker 0" });
+    pick("Simulate");
+    expect(screen.getByRole("alert").textContent).toContain("at least one log dir");
+    pick("Execute");
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(posts(calls)).toHaveLength(0);
+  });
+
+  it("remove disks explains a cluster that reports no log dirs and sends nothing", async () => {
+    const { OnlineLogDirsByBrokerId: _, ...rest } = clusterState.KafkaBrokerState;
+    const calls = setup("admin", "prod-b", { ...clusterState, KafkaBrokerState: rest });
+    render(<Admin />);
+    tab("Remove disks");
+    expect((await screen.findByText(/does not report any log dirs/)).textContent).toBeTruthy();
+    pick("Simulate");
+    expect(posts(calls)).toHaveLength(0);
   });
 
   it("does not send an unfilled required field", () => {

@@ -81,4 +81,10 @@ describe("verbose", () => {
       expect("verbose" in p, o.id).toBe(withIt.includes(o.id));
     }
   });
+
+  it("remove_disks sends brokerid_and_logdirs, an explicit dryrun and no verbose", () => {
+    const o = OPERATIONS.find((x) => x.id === "remove_disks")!;
+    expect(buildParams(o, { brokerid_and_logdirs: "0-/data/b,1-/data/a" }, true)).toEqual({ brokerid_and_logdirs: "0-/data/b,1-/data/a", dryrun: true });
+    expect(() => buildParams(o, { brokerid_and_logdirs: "0-/data/b" })).toThrow("dryrun must be explicit");
+  });
 });

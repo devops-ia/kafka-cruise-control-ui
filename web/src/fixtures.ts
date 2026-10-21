@@ -18,6 +18,7 @@ export const clusterState = {
     OfflineReplicaCountByBrokerId: { "0": 0, "1": 0 },
     IsController: { "0": true, "1": false },
     OfflineLogDirsByBrokerId: { "0": [], "1": [] },
+    OnlineLogDirsByBrokerId: { "0": ["/data/a", "/data/b"], "1": ["/data/a"] },
   },
   KafkaPartitionState: { offline: [], urp: [{ topic: "orders", partition: 3, leader: 0, replicas: [0, 1], "in-sync": [0], "out-of-sync": [1] }], "with-offline-replicas": [], "under-min-isr": [], other: [] },
 };
