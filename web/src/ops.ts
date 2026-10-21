@@ -1,6 +1,6 @@
 import type { Params } from "./api";
 
-export type FieldKind = "text" | "number" | "bool" | "goals" | "select";
+export type FieldKind = "text" | "number" | "bool" | "goals" | "select" | "logdirs";
 
 export interface Field {
   name: string;
@@ -139,6 +139,15 @@ export const OPERATIONS: Operation[] = [
       { name: "skip_rack_awareness_check", label: "Skip rack awareness check", kind: "bool" },
       tuning[6],
     ],
+  },
+  {
+    id: "remove_disks",
+    title: "Remove disks",
+    endpoint: "remove_disks",
+    description: "Move replicas off the chosen log dirs so the disks can be removed.",
+    dryRunnable: true,
+    confirm: true,
+    fields: [{ name: "brokerid_and_logdirs", label: "Log dirs to empty", kind: "logdirs", required: true }, tuning[5], tuning[6]],
   },
   {
     id: "admin",

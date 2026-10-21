@@ -83,6 +83,7 @@ Each operation has its own tab. The form shows a title, a description, the param
 | Demote broker | `demote_broker` | Broker IDs are required. Replication throttle and Disallow capacity estimation. |
 | Fix offline replicas | `fix_offline_replicas` | Common options. |
 | Topic replication factor | `topic_configuration` | Topic (regex) and replication factor are required. Common options, skip rack awareness check, skip hard goal check, concurrency and replication throttle. |
+| Remove disks | `remove_disks` | Pick the log dirs to empty (required), plus reason and "Stop the ongoing execution first". |
 | Self-healing and concurrency | `admin` | Enable or disable self-healing for anomaly types, change concurrency, max partition movements in cluster, intra-broker concurrency and execution progress check interval. |
 | Pause sampling | `pause_sampling` | |
 | Resume sampling | `resume_sampling` | |
@@ -90,11 +91,13 @@ Each operation has its own tab. The form shows a title, a description, the param
 
 The common options are "Disallow capacity estimation", "Use ready default goals" and "Data from" (Cruise Control default, valid windows or valid partitions). "Disallow capacity estimation" sends `allow_capacity_estimation=false` when checked and nothing when not. Each option appears only on the operations whose Cruise Control endpoint accepts it. There is no `replication_logdir_throttle` field: Cruise Control does not implement it and the proxy refuses it.
 
+Remove disks shows one group per broker with a checkbox for each online log dir, read from `kafka_cluster_state` (`OnlineLogDirsByBrokerId`). Your choice is sent as `brokerid_and_logdirs`, entries written `brokerId-logdir` and separated by commas, for example `0-/data/b,1-/data/a`. Cruise Control reads that list as comma separated, so a log dir whose path contains a comma is shown disabled with a note and cannot be selected. At least one log dir is required; with none checked, Simulate and Execute send nothing and say so. If the cluster does not report log dirs (it needs a Kafka version that does), the form says that and sends nothing. The Execute dialog lists the chosen log dirs. Like the other data-moving operations it does not send `verbose`.
+
 The optional "Goals" section is a closed "Goals, optional" block with hard and soft goals side by side. The goals come from the analyzer state of the selected cluster. Leave all unchecked to use Cruise Control's default goals.
 
 ### Simulate and Execute
 
-Operations that change data (everything from Rebalance to Topic replication factor, including Rebalance disks) have two buttons.
+Operations that change data (everything from Rebalance to Topic replication factor, including Rebalance disks and Remove disks) have two buttons.
 
 - **Simulate** sends `dryrun=true`. Cruise Control computes the result and changes nothing. Use it first.
 - **Execute** sends `dryrun=false` after a confirmation dialog that names the operation and the cluster. It starts the real movement.
