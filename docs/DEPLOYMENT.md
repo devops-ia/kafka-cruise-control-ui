@@ -320,7 +320,3 @@ The `-v` line is optional. The image ships a `config.csv` with a single line, `l
 The release comes from the `CC_UI_TAG` build argument (default `0.4.0`). The container runs nginx as user 101 and listens on port 80.
 
 The legacy UI has no login and no roles. Anyone who can reach it can run every operation, so do not expose it without another layer of protection. To move to the current UI, see [Migration from the legacy UI](MIGRATION.md).
-
-## Documentation site
-
-This site is published by the `Pages` workflow on every push to `main`. In the repository, Settings > Pages > Source must be GitHub Actions. With "Deploy from a branch", GitHub publishes the README through Jekyll and overwrites this site.
