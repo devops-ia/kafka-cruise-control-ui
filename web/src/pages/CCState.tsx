@@ -3,6 +3,7 @@ import { Async } from "../components/Async";
 import { Tabs } from "../components/KeyValues";
 import { Progress } from "../components/Meter";
 import { Panel, Rows } from "../components/Panel";
+import { IntraMovementTable } from "../components/MovementTable";
 import { JsonView } from "../components/Results";
 import { Table } from "../components/Table";
 import { formatMB, formatPct, formatTime } from "../format";
@@ -37,6 +38,18 @@ function Movement(props: { title: string; done?: number; total?: number; running
   );
 }
 
+const INTRA: [string, string][] = [["completed", "Completed"], ["pending", "Pending"], ["inProgress", "In progress"], ["aborting", "Aborting"], ["aborted", "Aborted"], ["dead", "Dead"], ["cancelled", "Cancelled"]];
+
+// One list per state; entries in the pending list carry their own state, as in the legacy Executor view.
+function intraLists(e: any): [string, any[]][] {
+  const get = (k: string): any[] => (Array.isArray(e[`${k}IntraBrokerPartitionMovement`]) ? e[`${k}IntraBrokerPartitionMovement`] : []);
+  const pend = get("pending");
+  return INTRA.map(([k, title]) => {
+    const rows = k === "pending" ? pend.filter((m) => m?.state === "PENDING") : k === "inProgress" ? [...get(k), ...pend.filter((m) => m?.state === "IN_PROGRESS")] : get(k);
+    return [`${title} intra-broker movements`, rows];
+  });
+}
+
 function Executor({ e }: { e: any }) {
   if (!e) return <p class="muted">No executor data.</p>;
   const task = e.triggeredUserTaskId || e.triggeredSelfHealingTaskId;
@@ -62,6 +75,7 @@ function Executor({ e }: { e: any }) {
       <Panel title="Recent broker changes">
         <Rows rows={[["Recently demoted brokers", brokers(e.recentlyDemotedBrokers)], ["Recently removed brokers", brokers(e.recentlyRemovedBrokers)]]} />
       </Panel>
+      {intraLists(e).map(([title, rows]) => rows.length > 0 && <IntraMovementTable key={title} title={title} movements={rows} />)}
       <AllFields data={e} />
     </div>
   );

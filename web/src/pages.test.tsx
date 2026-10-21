@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/preact";
-import { ccState, clusterState, load, optimization, userTasks } from "./fixtures";
+import { ccState, ccStateIntra, clusterState, load, optimization, optimizationVerbose, userTasks } from "./fixtures";
 import { goalsFromState } from "./goals";
 import { CCState } from "./pages/CCState";
 import { ConfigInsights } from "./pages/ConfigInsights";
@@ -323,6 +323,86 @@ describe("CC state and goals", () => {
     expect(screen.getByText("No monitor data.")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Anomaly detector" }));
     expect(screen.getByText("No anomaly detector data.")).toBeTruthy();
+  });
+});
+
+describe("result tables", () => {
+  const viewProposals = async (body: unknown = optimizationVerbose) => {
+    const calls = serve({ proposals: body });
+    render(<Proposals />);
+    await screen.findByText("Replica movements");
+    return calls;
+  };
+
+  it("Proposals lists partition movements, marks removed and added replicas, and filters by topic", async () => {
+    await viewProposals();
+    const t = screen.getByRole("region", { name: "Proposed partition movements (2)" });
+    const row = within(t).getByRole("row", { name: /orders/ });
+    expect(row.textContent).toContain("0, 1 removed");
+    expect(row.textContent).toContain("0, 2 added");
+    fireEvent.input(within(t).getByLabelText("Filter Topic"), { target: { value: "pay" } });
+    expect(within(t).queryByRole("row", { name: /orders/ })).toBeNull();
+    expect(within(t).getByRole("row", { name: /payments/ })).toBeTruthy();
+    expect(within(t).getByRole("button", { name: "Topic" })).toBeTruthy();
+  });
+
+  it("Proposals without proposals or load shows neither table nor an error", async () => {
+    await viewProposals(optimization);
+    expect(screen.queryByRole("region", { name: /Proposed partition movements/ })).toBeNull();
+    expect(screen.queryByRole("region", { name: /Load by/ })).toBeNull();
+    cleanup();
+    await viewProposals({ ...optimization, proposals: [] });
+    expect(screen.queryByRole("region", { name: /Proposed partition movements/ })).toBeNull();
+  });
+
+  it("Load diff shows before, after and a signed change per broker, with units, and a new broker without a percentage", async () => {
+    await viewProposals();
+    const t = screen.getByRole("region", { name: "Load before and after by broker" });
+    const row = within(t).getByRole("row", { name: /kafka-1/ });
+    for (const x of ["80", "70", "-12.5%", "75%", "50%", "-33.3%", "5 GiB", "4 GiB", "400 KiB/s", "300 KiB/s"]) expect(within(row).getByText(x)).toBeTruthy();
+    const fresh = within(t).getByRole("row", { name: /kafka-2/ });
+    expect(fresh.textContent).not.toContain("%-");
+    expect(within(fresh).getByText("10")).toBeTruthy();
+    expect(within(fresh).queryByText(/^[+-]\d/)).toBeNull();
+  });
+
+  it("Load diff shows an increase with +, switches to hosts, and lists disks with DEAD as text", async () => {
+    await viewProposals({ ...optimizationVerbose, loadBeforeOptimization: { ...optimizationVerbose.loadBeforeOptimization, brokers: [{ Broker: 1, Host: "kafka-1", Replicas: 70 }] }, loadAfterOptimization: { brokers: [{ Broker: 1, Host: "kafka-1", Replicas: 77, DiskState: { "/data/b": { NumReplicas: 1, NumLeaderReplicas: 0, DiskMB: 0, DiskPct: "DEAD" } } }], hosts: [{ Host: "kafka-1", Replicas: 70 }] } });
+    expect(within(screen.getByRole("row", { name: /kafka-1/ })).getByText("+10.0%")).toBeTruthy();
+    const disks = screen.getByRole("region", { name: "Load by disk" });
+    expect(within(within(disks).getByRole("row", { name: /\/data\/b/ })).getByText("DEAD")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "By host" }));
+    expect(screen.getByRole("region", { name: "Load before and after by host" })).toBeTruthy();
+  });
+
+  it("Proposals sends rebalance_disk only when the box is checked and keeps the box focused", async () => {
+    const calls = await viewProposals();
+    expect(calls[0].query.get("verbose")).toBe("true");
+    expect(calls[0].query.get("rebalance_disk")).toBeNull();
+    const box = screen.getByLabelText("Intra-broker rebalance disk proposal") as HTMLInputElement;
+    box.focus();
+    fireEvent.click(box);
+    await waitFor(() => expect(calls[calls.length - 1].query.get("rebalance_disk")).toBe("true"));
+    expect(calls[calls.length - 1].query.get("verbose")).toBe("true");
+    expect(document.activeElement).toBe(screen.getByLabelText("Intra-broker rebalance disk proposal"));
+  });
+
+  it("Executor lists intra-broker movements and splits pending by state", async () => {
+    serve({ state: ccStateIntra });
+    render(<CCState />);
+    const inprog = await screen.findByRole("region", { name: "In progress intra-broker movements (2)" });
+    expect(within(inprog).getByRole("row", { name: /orders 3 1/ })).toBeTruthy();
+    expect(within(inprog).getByRole("row", { name: /payments 1 1/ })).toBeTruthy();
+    const pending = screen.getByRole("region", { name: "Pending intra-broker movements (1)" });
+    expect(within(pending).getByRole("row", { name: /payments 0 2/ })).toBeTruthy();
+    expect(screen.queryByRole("region", { name: /Completed intra-broker/ })).toBeNull();
+  });
+
+  it("Executor without intra-broker lists shows no such table", async () => {
+    serve({ state: { ...ccState, ExecutorState: { state: "NO_TASK_IN_PROGRESS", pendingIntraBrokerPartitionMovement: [], inProgressIntraBrokerPartitionMovement: "bad" } } });
+    render(<CCState />);
+    await screen.findByText("No execution in progress.");
+    expect(screen.queryByRole("region", { name: /intra-broker movements/ })).toBeNull();
   });
 });
 

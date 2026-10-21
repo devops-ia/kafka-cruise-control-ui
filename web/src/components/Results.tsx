@@ -1,4 +1,6 @@
 import { formatMB } from "../format";
+import { LoadDiff } from "./LoadDiff";
+import { MovementTable } from "./MovementTable";
 import { Table } from "./Table";
 
 
@@ -36,12 +38,8 @@ export function OptimizationView({ data }: { data: any }) {
           ]}
         />
       )}
-      {Array.isArray(data.proposals) && data.proposals.length > 0 && (
-        <details>
-          <summary>Proposals ({data.proposals.length})</summary>
-          <JsonView data={data.proposals} />
-        </details>
-      )}
+      {Array.isArray(data.proposals) && data.proposals.length > 0 && <MovementTable title="Proposed partition movements" movements={data.proposals} />}
+      {data.loadBeforeOptimization && data.loadAfterOptimization && <LoadDiff before={data.loadBeforeOptimization} after={data.loadAfterOptimization} />}
     </div>
   );
 }
