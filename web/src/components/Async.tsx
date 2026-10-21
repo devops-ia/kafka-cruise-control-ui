@@ -36,7 +36,7 @@ export function RefreshBar(props: { updatedAt?: Date; loading?: boolean; onReloa
 }
 
 /** Page frame: title, refresh controls and distinct loading, error and empty states. */
-export function Async<T>(props: { title: string; res: Resource<T>; empty?: (data: T) => boolean; children: (data: T) => ComponentChildren }) {
+export function Async<T>(props: { title: string; res: Resource<T>; empty?: (data: T) => boolean; controls?: ComponentChildren; children: (data: T) => ComponentChildren }) {
   const { res } = props;
   let body: ComponentChildren;
   if (res.error && !res.data) {
@@ -75,6 +75,7 @@ export function Async<T>(props: { title: string; res: Resource<T>; empty?: (data
           Last refresh failed: {res.error.message}
         </p>
       )}
+      {props.controls}
       {body}
     </section>
   );

@@ -5,6 +5,7 @@ import { CCState } from "./pages/CCState";
 import { ConfigInsights } from "./pages/ConfigInsights";
 import { ClusterState } from "./pages/ClusterState";
 import { Load } from "./pages/Load";
+import { PartitionLoad } from "./pages/PartitionLoad";
 import { Proposals } from "./pages/Proposals";
 import { Summary } from "./pages/Summary";
 import { UserTasks } from "./pages/UserTasks";
@@ -46,6 +47,41 @@ describe("read pages", () => {
     expect(screen.getAllByRole("row", { name: /kafka-/ })).toHaveLength(2);
     fireEvent.click(screen.getByRole("button", { name: "By host" }));
     expect(screen.getByRole("region", { name: "Load by host" })).toBeTruthy();
+  });
+
+  it("Load sends no parameters by default and keeps its controls and focus while a changed option reloads", async () => {
+    const calls = serve({ load });
+    render(<Load />);
+    await screen.findByRole("row", { name: /kafka-1/ });
+    expect(calls[0].query.toString()).toBe("");
+    const box = screen.getByLabelText("Populate disk info") as HTMLInputElement;
+    expect((screen.getByLabelText("Allow capacity estimation") as HTMLInputElement).checked).toBe(true);
+    box.focus();
+    fireEvent.click(box);
+    await waitFor(() => expect(calls[calls.length - 1].query.get("populate_disk_info")).toBe("true"));
+    expect(document.activeElement).toBe(screen.getByLabelText("Populate disk info"));
+    await screen.findByRole("row", { name: /kafka-1/ });
+    const disks = screen.getByRole("region", { name: "Load by disk" });
+    expect(within(within(disks).getByRole("row", { name: /\/data\/b/ })).getByText("DEAD")).toBeTruthy();
+    expect(within(disks).getAllByRole("row", { name: /\/data\// })).toHaveLength(2);
+    fireEvent.click(screen.getByLabelText("Allow capacity estimation"));
+    await waitFor(() => expect(calls[calls.length - 1].query.get("allow_capacity_estimation")).toBe("false"));
+  });
+
+  it("Partition load sends a trimmed topic filter on Enter, omits it when blank, and keeps the field when nothing matches", async () => {
+    const calls = serve({ partition_load: { records: [] } });
+    render(<PartitionLoad />);
+    expect(await screen.findByText("Nothing to show.")).toBeTruthy();
+    expect(calls[0].query.get("topic")).toBeNull();
+    const input = screen.getByLabelText("Topic (regex)") as HTMLInputElement;
+    fireEvent.input(input, { target: { value: " orders.* " } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() => expect(calls[calls.length - 1].query.get("topic")).toBe("orders.*"));
+    expect(await screen.findByText("Nothing to show.")).toBeTruthy();
+    expect((screen.getByLabelText("Topic (regex)") as HTMLInputElement).value).toBe(" orders.* ");
+    fireEvent.input(screen.getByLabelText("Topic (regex)"), { target: { value: "  " } });
+    fireEvent.blur(screen.getByLabelText("Topic (regex)"));
+    await waitFor(() => expect(calls[calls.length - 1].query.get("topic")).toBeNull());
   });
 
   it("Cluster state is one partition health table with the broker role as a tag", async () => {
@@ -255,6 +291,29 @@ describe("CC state and goals", () => {
     cleanup();
     await open(ccState, "Anomaly detector");
     expect(screen.getByText("No recent anomalies.")).toBeTruthy();
+  });
+
+  it("Anomaly detector shows the self-healing ratio per type and the self-healing metrics, and copes without them", async () => {
+    await open(ccState, "Anomaly detector");
+    expect(screen.getByText("BROKER_FAILURE").parentElement?.textContent).toContain("100%");
+    expect(screen.getByText("GOAL_VIOLATION").parentElement?.textContent).toContain("50%");
+    expect(screen.getByText("1.5 minutes")).toBeTruthy();
+    expect(screen.getByText("Self-healing started").nextSibling?.textContent).toBe("4");
+    expect(screen.getByText("Self-healing failed to start").nextSibling?.textContent).toBe("1");
+    cleanup();
+    await open({ ...ccState, AnomalyDetectorState: { selfHealingEnabled: ["BROKER_FAILURE"] } }, "Anomaly detector");
+    expect(screen.getByText("BROKER_FAILURE")).toBeTruthy();
+    expect(screen.queryByText("Self-healing started")).toBeNull();
+  });
+
+  it("Monitor shows the loading progress only while LOADING", async () => {
+    await open({ ...ccState, MonitorState: { state: "LOADING", loadingProgressPct: 42.5 } }, "Monitor");
+    expect(screen.getByText("Loading progress")).toBeTruthy();
+    expect(screen.getByText("42.5%")).toBeTruthy();
+    expect(bar("Loading progress").value).toBe(43); // Progress rounds to whole percents
+    cleanup();
+    await open({ ...ccState, MonitorState: { state: "RUNNING", loadingProgressPct: 100 } }, "Monitor");
+    expect(screen.queryByText("Loading progress")).toBeNull();
   });
 
   it("an unknown field or a missing section does not break the page", async () => {
