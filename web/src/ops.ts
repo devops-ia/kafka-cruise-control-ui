@@ -23,6 +23,8 @@ export interface Operation {
   /** Ask for confirmation before a real execution. */
   confirm: boolean;
   fixed?: Params;
+  /** Sends verbose=true so the result carries the proposals and the load before and after. */
+  verbose?: boolean;
   fields: Field[];
 }
 
@@ -53,7 +55,7 @@ const destinations: Field = { name: "destination_broker_ids", label: "Destinatio
 const brokers = (help: string): Field => ({ name: "brokerid", label: "Broker IDs", kind: "text", required: true, help });
 
 export const OPERATIONS: Operation[] = [
-  { id: "rebalance", title: "Rebalance", endpoint: "rebalance", description: "Move replicas and leaders to balance the cluster.", dryRunnable: true, confirm: true, fields: [goals, ...tuning, capacity, readyGoals, dataFrom, assigner, destinations] },
+  { id: "rebalance", title: "Rebalance", endpoint: "rebalance", description: "Move replicas and leaders to balance the cluster.", dryRunnable: true, confirm: true, verbose: true, fields: [goals, ...tuning, capacity, readyGoals, dataFrom, assigner, destinations] },
   {
     id: "leader_election",
     title: "Preferred leader election",
@@ -61,6 +63,7 @@ export const OPERATIONS: Operation[] = [
     description: "Move leadership back to the preferred replicas without moving data.",
     dryRunnable: true,
     confirm: true,
+    verbose: true,
     fixed: { goals: "PreferredLeaderElectionGoal" },
     fields: [tuning[1], tuning[3], tuning[6]],
   },
@@ -71,6 +74,7 @@ export const OPERATIONS: Operation[] = [
     description: "Move replicas between the disks of each broker, not between brokers.",
     dryRunnable: true,
     confirm: true,
+    verbose: true,
     fixed: { rebalance_disk: true },
     fields: [tuning[6]],
   },
@@ -81,6 +85,7 @@ export const OPERATIONS: Operation[] = [
     description: "Move load onto newly added brokers.",
     dryRunnable: true,
     confirm: true,
+    verbose: true,
     fields: [brokers("Comma separated, for example 3,4"), { name: "throttle_added_broker", label: "Throttle added broker", kind: "bool" }, goals, ...tuning, capacity, readyGoals, dataFrom, assigner],
   },
   {
@@ -90,6 +95,7 @@ export const OPERATIONS: Operation[] = [
     description: "Move everything off the brokers so they can be shut down.",
     dryRunnable: true,
     confirm: true,
+    verbose: true,
     fields: [brokers("Comma separated, for example 3"), { name: "throttle_removed_broker", label: "Throttle removed broker", kind: "bool" }, goals, ...tuning, capacity, readyGoals, dataFrom, assigner, destinations],
   },
   {
@@ -99,6 +105,7 @@ export const OPERATIONS: Operation[] = [
     description: "Move leadership away from the brokers.",
     dryRunnable: true,
     confirm: true,
+    verbose: true,
     fields: [
       brokers("Comma separated, for example 3"),
       { name: "skip_urp_demotion", label: "Skip under-replicated partitions", kind: "bool" },
@@ -109,7 +116,7 @@ export const OPERATIONS: Operation[] = [
       tuning[6],
     ],
   },
-  { id: "fix_offline_replicas", title: "Fix offline replicas", endpoint: "fix_offline_replicas", description: "Move replicas off dead disks and brokers.", dryRunnable: true, confirm: true, fields: [goals, ...tuning, capacity, readyGoals, dataFrom] },
+  { id: "fix_offline_replicas", title: "Fix offline replicas", endpoint: "fix_offline_replicas", description: "Move replicas off dead disks and brokers.", dryRunnable: true, confirm: true, verbose: true, fields: [goals, ...tuning, capacity, readyGoals, dataFrom] },
   {
     id: "topic_configuration",
     title: "Topic replication factor",
@@ -117,6 +124,7 @@ export const OPERATIONS: Operation[] = [
     description: "Change the replication factor of topics.",
     dryRunnable: true,
     confirm: true,
+    verbose: true,
     fields: [
       { name: "topic", label: "Topic (regex)", kind: "text", required: true },
       { name: "replication_factor", label: "Replication factor", kind: "number", required: true },
@@ -168,6 +176,7 @@ export type Values = Record<string, string | boolean>;
 /** Query parameters for a form. Empty fields are left out; dryrun is always explicit for operations that have it. */
 export function buildParams(op: Operation, values: Values, dryrun?: boolean): Params {
   const p: Params = { ...op.fixed };
+  if (op.verbose) p.verbose = true;
   for (const f of op.fields) {
     const v = values[f.name];
     if (f.kind === "bool") {

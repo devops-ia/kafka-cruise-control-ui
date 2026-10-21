@@ -37,7 +37,7 @@ The cluster's Kafka state as Cruise Control reports it, from top to bottom:
 
 The first row shows the executor, the monitor, the analyzer (proposal ready or not) and the balancedness score. Four tabs hold the detail. Each also has an "All fields" section with the raw values Cruise Control returned.
 
-**Executor.** Whether a rebalance is running. While one is, you see partition and leadership movements as finished of total with a progress bar, the amount of data moved, the task that triggered it and its reason. The tab also lists recently demoted and removed brokers.
+**Executor.** Whether a rebalance is running. While one is, you see partition and leadership movements as finished of total with a progress bar, the amount of data moved, the task that triggered it and its reason. The tab also lists recently demoted and removed brokers. When Cruise Control reports intra-broker movements, one table per non-empty list follows (for example "In progress intra-broker movements (2)", "Pending intra-broker movements (1)") with topic, partition and broker. Entries in the pending list that are already IN_PROGRESS appear under In progress.
 
 ![Cruise Control state, executor tab](assets/screenshots/cc-state-executor.png)
 
@@ -65,7 +65,7 @@ The heaviest partitions for one resource. "Sort by" takes cpu, networkInbound, n
 
 ## Proposals
 
-Asks Cruise Control for the proposal it would make with its default goals, and shows replica movements, data to move, leader movements, intra-broker movements, the balancedness score before and after, a table of goals with a VIOLATED mark where one could not be met, and the proposals themselves in a collapsed section. Nothing is executed. This page needs the admin role.
+Asks Cruise Control for the proposal it would make with its default goals, and shows replica movements, data to move, leader movements, intra-broker movements, the balancedness score before and after, a table of goals with a VIOLATED mark where one could not be met, and two blocks that come from the verbose answer. "Proposed partition movements (n)" is a table with topic, partition, old replicas and new replicas; it sorts, filters by topic, and marks removed and added replicas with colour, and also with hidden text ("removed", "added") for screen readers. "Load before and after by broker" (switch to "By host" with the tabs) shows each value before and after with the signed change, for example `80 → 70 -12.5%`; a broker that was not in the earlier load shows only its new value. When the brokers report per-disk data, a "Load by disk" table adds one row per broker and log dir (a dead disk shows DEAD). A block is left out when Cruise Control does not send its data. The "Intra-broker rebalance disk proposal" box asks again with `rebalance_disk=true`; it stays on screen and focused while the page reloads. Nothing is executed. This page needs the admin role.
 
 ## Admin
 
@@ -123,7 +123,7 @@ The list of tasks Cruise Control knows about: when they started, status, the req
 
 Operations that take time (HTTP 202 with a `User-Task-ID`) appear in an "Operations" panel in the corner, on every page, so you can keep navigating. Each entry shows the endpoint and cluster, a "dry run" mark, a state (running, done, error or waiting for review), the User-Task-ID and, while running, the latest progress step and percentage. It checks again every two seconds until Cruise Control finishes.
 
-Done entries have "Show result", which expands the same result view as Proposals. Entries that are not running have "Dismiss". The panel is kept in the browser's memory only: a reload clears it, but the task itself continues in Cruise Control and stays in User tasks.
+Done entries have "Show result", which expands the same result view as Proposals. Operations that return proposals send `verbose=true`, which is what makes the movement and load tables appear there. Entries that are not running have "Dismiss". The panel is kept in the browser's memory only: a reload clears it, but the task itself continues in Cruise Control and stays in User tasks.
 
 ## What a viewer sees
 

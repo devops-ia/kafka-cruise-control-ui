@@ -5,11 +5,11 @@ const op = (id: string) => OPERATIONS.find((o) => o.id === id)!;
 describe("operation parameters", () => {
   it("applies the throttle on remove_broker", () => {
     const p = buildParams(op("remove_broker"), { brokerid: "3", throttle_removed_broker: true }, false);
-    expect(p).toEqual({ brokerid: "3", throttle_removed_broker: true, dryrun: false });
+    expect(p).toEqual({ brokerid: "3", throttle_removed_broker: true, verbose: true, dryrun: false });
   });
   it("leaves empty fields and unchecked boxes out", () => {
     const p = buildParams(op("rebalance"), { goals: "", skip_hard_goal_check: false, reason: "  " }, true);
-    expect(p).toEqual({ dryrun: true });
+    expect(p).toEqual({ verbose: true, dryrun: true });
   });
   it("always sends dryrun explicitly and refuses to guess", () => {
     expect(() => buildParams(op("rebalance"), {})).toThrow();
@@ -21,7 +21,7 @@ describe("operation parameters", () => {
   it("maps preferred leader election onto rebalance with its goal", () => {
     const o = op("leader_election");
     expect(o.endpoint).toBe("rebalance");
-    expect(buildParams(o, {}, true)).toEqual({ goals: "PreferredLeaderElectionGoal", dryrun: true });
+    expect(buildParams(o, {}, true)).toEqual({ goals: "PreferredLeaderElectionGoal", verbose: true, dryrun: true });
   });
   it("does not offer throttle_removed_broker on add_broker", () => {
     expect(op("add_broker").fields.some((f) => f.name === "throttle_removed_broker")).toBe(false);
@@ -33,7 +33,7 @@ describe("operation parameters", () => {
 
   it("sends the common rebalance options", () => {
     const p = buildParams(op("rebalance"), { destination_broker_ids: "1,2", data_from: "valid_windows", kafka_assigner: true, use_ready_default_goals: true }, true);
-    expect(p).toEqual({ destination_broker_ids: "1,2", data_from: "valid_windows", kafka_assigner: true, use_ready_default_goals: true, dryrun: true });
+    expect(p).toEqual({ destination_broker_ids: "1,2", data_from: "valid_windows", kafka_assigner: true, use_ready_default_goals: true, verbose: true, dryrun: true });
   });
   it("Disallow capacity estimation sends false, and nothing when unchecked", () => {
     expect(buildParams(op("add_broker"), { brokerid: "3", allow_capacity_estimation: true }, true).allow_capacity_estimation).toBe(false);
@@ -69,6 +69,16 @@ describe("operation parameters", () => {
     const o = op("rebalance_disk");
     expect(o.endpoint).toBe("rebalance");
     expect(o.fields.some((f) => f.name === "goals")).toBe(false);
-    expect(buildParams(o, {}, true)).toEqual({ rebalance_disk: true, dryrun: true });
+    expect(buildParams(o, {}, true)).toEqual({ rebalance_disk: true, verbose: true, dryrun: true });
+  });
+});
+
+describe("verbose", () => {
+  it("is sent by operations with proposals and by no other", () => {
+    const withIt = ["rebalance", "leader_election", "rebalance_disk", "add_broker", "remove_broker", "demote_broker", "fix_offline_replicas", "topic_configuration"];
+    for (const o of OPERATIONS) {
+      const p = buildParams(o, { brokerid: "1", topic: "t", replication_factor: "2" }, o.dryRunnable ? true : undefined);
+      expect("verbose" in p, o.id).toBe(withIt.includes(o.id));
+    }
   });
 });
