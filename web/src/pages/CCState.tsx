@@ -81,6 +81,7 @@ function Monitor({ m }: { m: any }) {
             ["Valid partitions", m.numValidPartitions !== undefined ? `${m.numValidPartitions} of ${m.numTotalPartitions ?? "?"}` : undefined],
             ["Flawed partitions", m.numFlawedPartitions],
             ["Coverage", cov !== undefined ? <><Progress label="Monitor window coverage" value={cov} total={100} /> <span class="mono">{formatPct(cov)}</span></> : undefined],
+            ["Loading progress", m.state === "LOADING" && num(m.loadingProgressPct) !== undefined ? <><Progress label="Loading progress" value={m.loadingProgressPct} total={100} /> <span class="mono">{formatPct(m.loadingProgressPct)}</span></> : undefined],
             ["Last pause or resume", m.reasonOfLatestPauseOrResume || undefined],
           ]}
         />
@@ -148,11 +149,16 @@ const ANOMALIES: [string, string][] = [
 function Anomalies({ d }: { d: any }) {
   if (!d) return <p class="muted">No anomaly detector data.</p>;
   const rows = ANOMALIES.flatMap(([key, type]) => (Array.isArray(d[key]) ? d[key] : []).map((a: any) => ({ type, id: String(a.anomalyId ?? ""), status: String(a.status ?? ""), at: num(a.detectionMs) })));
-  const names = (v: unknown) => (Array.isArray(v) && v.length ? v.map((n) => <span key={n}>{tag(String(n), "")} </span>) : <span class="muted">none</span>);
+  const ratio = (n: string) => (num(d.selfHealingEnabledRatio?.[n]) !== undefined ? ` ${formatPct(d.selfHealingEnabledRatio[n] * 100)}` : "");
+  const names = (v: unknown) => (Array.isArray(v) && v.length ? v.map((n) => <span key={n}>{tag(String(n), "")}{ratio(n)} </span>) : <span class="muted">none</span>);
+  const mt = d.metrics ?? {};
   return (
     <div class="stack">
       <Panel title="Self-healing">
-        <Rows rows={[["Enabled for", names(d.selfHealingEnabled)], ["Disabled for", names(d.selfHealingDisabled)], ["Ongoing self-healing", d.ongoingSelfHealingAnomaly || undefined]]} />
+        <Rows rows={[["Enabled for", names(d.selfHealingEnabled)], ["Disabled for", names(d.selfHealingDisabled)], ["Ongoing self-healing", d.ongoingSelfHealingAnomaly || undefined],
+          ["Mean time to start fix", num(mt.meanTimeToStartFixMs) !== undefined ? `${Math.round(mt.meanTimeToStartFixMs / 6000) / 10} minutes` : undefined],
+          ["Self-healing started", num(mt.numSelfHealingStarted)],
+          ["Self-healing failed to start", num(mt.numSelfHealingFailedToStart)]]} />
       </Panel>
       <Panel title="Recent anomalies" aside={<span class="mono muted">{rows.length}</span>}>
         {rows.length === 0 ? (

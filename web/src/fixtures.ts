@@ -3,7 +3,7 @@ export const load = {
   version: 1,
   brokers: [
     { Broker: 0, Host: "kafka-0", Rack: "r1", BrokerState: "ALIVE", CpuPct: 12.5, DiskPct: 40, DiskMB: 1024, LeaderNwInRate: 100, FollowerNwInRate: 50, NwOutRate: 300, Replicas: 120, Leaders: 40 },
-    { Broker: 1, Host: "kafka-1", Rack: "r2", BrokerState: "ALIVE", CpuPct: 75, DiskPct: 91, DiskMB: 5120, LeaderNwInRate: 200, FollowerNwInRate: 80, NwOutRate: 400, Replicas: 80, Leaders: 30 },
+    { Broker: 1, Host: "kafka-1", Rack: "r2", BrokerState: "ALIVE", CpuPct: 75, DiskPct: 91, DiskMB: 5120, LeaderNwInRate: 200, FollowerNwInRate: 80, NwOutRate: 400, Replicas: 80, Leaders: 30, DiskState: { "/data/a": { NumReplicas: 50, NumLeaderReplicas: 20, DiskMB: 2048, DiskPct: 40 }, "/data/b": { NumReplicas: 30, NumLeaderReplicas: 10, DiskMB: 0, DiskPct: "DEAD" } } },
   ],
   hosts: [{ Host: "kafka-0", Rack: "r1", CpuPct: 12.5, DiskPct: 40, DiskMB: 1024, LeaderNwInRate: 100, FollowerNwInRate: 50, NwOutRate: 300, Replicas: 120, Leaders: 40 }],
 };
@@ -36,7 +36,13 @@ export const ccState = {
       { name: "MyCustomGoal", status: "ready" },
     ],
   },
-  AnomalyDetectorState: { selfHealingEnabled: ["BROKER_FAILURE"], balancednessScore: 97.5 },
+  AnomalyDetectorState: {
+    selfHealingEnabled: ["BROKER_FAILURE"],
+    selfHealingDisabled: ["GOAL_VIOLATION"],
+    selfHealingEnabledRatio: { BROKER_FAILURE: 1, GOAL_VIOLATION: 0.5 },
+    metrics: { meanTimeToStartFixMs: 90000, numSelfHealingStarted: 4, numSelfHealingFailedToStart: 1 },
+    balancednessScore: 97.5,
+  },
 };
 
 export const optimization = {

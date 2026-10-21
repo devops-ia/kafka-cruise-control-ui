@@ -41,13 +41,13 @@ The first row shows the executor, the monitor, the analyzer (proposal ready or n
 
 ![Cruise Control state, executor tab](assets/screenshots/cc-state-executor.png)
 
-**Monitor.** The load monitor: its state, whether the model is trained, monitored windows, valid and flawed partitions, and the coverage percentage.
+**Monitor.** The load monitor: its state, whether the model is trained, monitored windows, valid and flawed partitions, and the coverage percentage. While the monitor state is LOADING, a "Loading progress" row with a bar shows how far it is.
 
 **Analyzer.** Hard and soft goals, each marked READY or NOT READY. A note appears when no proposal can be computed yet, which usually means Cruise Control needs more monitored windows. Window coverage is repeated at the bottom.
 
 ![Cruise Control state, analyzer tab](assets/screenshots/cc-state-analyzer.png)
 
-**Anomaly detector.** For which anomaly types self-healing is enabled and disabled, the self-healing running now, and a table of recent goal violations, broker failures, metric anomalies, disk failures, topic anomalies and maintenance events.
+**Anomaly detector.** For which anomaly types self-healing is enabled and disabled, the self-healing running now, and a table of recent goal violations, broker failures, metric anomalies, disk failures, topic anomalies and maintenance events. Each type shown under Enabled for or Disabled for carries its self-healing ratio as a percentage, and the panel lists the mean time to start a fix (in minutes), "Self-healing started" and "Self-healing failed to start" when Cruise Control reports them.
 
 ## Config insights
 
@@ -57,11 +57,11 @@ Shows what the browser may know about the setup and nothing more: your user name
 
 ## Load
 
-Load per broker or per host, switched with the tabs. Columns: host, rack, state, CPU, disk percentage, disk used, leader and follower network in, network out, replicas and leaders. All are sortable.
+Load per broker or per host, switched with the tabs. Columns: host, rack, state, CPU, disk percentage, disk used, leader and follower network in, network out, replicas and leaders. All are sortable. "Populate disk info" (off by default) asks Cruise Control for per-disk data; when the brokers report it, a "Load by disk" table shows one row per broker and log dir with replicas, leaders, disk used and percentage (a dead disk shows DEAD). "Allow capacity estimation" is on by default; clear it to send `allow_capacity_estimation=false`. The options stay on screen while the page reloads.
 
 ## Partition load
 
-The heaviest partitions for one resource. "Sort by" takes cpu, networkInbound, networkOutbound or disk, and "Rows" the number of partitions to fetch (1 to 5,000, 100 by default).
+The heaviest partitions for one resource. "Sort by" takes cpu, networkInbound, networkOutbound or disk, and "Rows" the number of partitions to fetch (1 to 5,000, 100 by default). "Topic (regex)" limits the list to matching topics; press Enter or leave the field to apply it. An empty field sends no filter, and the field stays visible when nothing matches.
 
 ## Proposals
 
