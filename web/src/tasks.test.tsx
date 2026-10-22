@@ -1,5 +1,6 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/preact";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/preact";
 import { useState } from "preact/hooks";
+import { ResultDialog } from "./components/Dialog";
 import { TaskPanel } from "./components/TaskPanel";
 import { optimization } from "./fixtures";
 import { PeerReview } from "./pages/PeerReview";
@@ -120,5 +121,96 @@ describe("two-step verification", () => {
     render(<PeerReview />);
     expect(await screen.findByText(/cluster unavailable/)).toBeTruthy();
     expect(screen.queryByText(/Two-step verification is disabled/)).toBeNull();
+  });
+});
+
+describe("result dialog", () => {
+  const done = { id: 1, endpoint: "rebalance", cluster: "a", dryrun: "true", state: "done", result: optimization } as unknown as ReturnType<typeof tasks.get>[number];
+
+  it("opens the result in a modal dialog with Close and Dismiss, and no inline result", () => {
+    tasks.set([done]);
+    render(<TaskPanel />);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Show result" }));
+    const dlg = screen.getByRole("dialog");
+    expect(dlg.getAttribute("aria-modal")).toBe("true");
+    expect(dlg.textContent).toMatch(/rebalance/);
+    expect(dlg.textContent).toMatch(/dry run/);
+    expect(dlg.contains(document.activeElement)).toBe(true);
+    expect(screen.getByRole("button", { name: "Close" })).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: "Dismiss" }).length).toBe(2);
+    expect(screen.queryByRole("button", { name: "Hide result" })).toBeNull();
+  });
+
+  it("Close and Escape keep the task and return focus to Show result", () => {
+    tasks.set([done]);
+    render(<TaskPanel />);
+    const show = screen.getByRole("button", { name: "Show result" });
+    show.focus();
+    fireEvent.click(show);
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(tasks.get()).toHaveLength(1);
+    expect(document.activeElement).toBe(show);
+    fireEvent.click(show);
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(tasks.get()).toHaveLength(1);
+  });
+
+  it("Escape returns focus to the opener", () => {
+    tasks.set([done]);
+    render(<TaskPanel />);
+    const show = screen.getByRole("button", { name: "Show result" });
+    show.focus();
+    fireEvent.click(show);
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    expect(document.activeElement).toBe(show);
+  });
+
+  it("Dismiss in the dialog moves focus to the Operations heading, not the body", () => {
+    tasks.set([done, { ...done, id: 2 }]);
+    render(<TaskPanel />);
+    fireEvent.click(screen.getAllByRole("button", { name: "Show result" })[0]);
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Dismiss" }));
+    expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Operations" }));
+  });
+
+  it("Tab wraps over inputs and skips disabled controls, both ways", () => {
+    render(
+      <ResultDialog title="t" onClose={() => {}} onDismiss={() => {}}>
+        <input aria-label="filter" />
+        <button type="button" disabled>
+          off
+        </button>
+      </ResultDialog>,
+    );
+    const dlg = screen.getByRole("dialog");
+    const filter = screen.getByLabelText("filter");
+    filter.focus();
+    fireEvent.keyDown(dlg, { key: "Tab" });
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Close" }));
+    fireEvent.keyDown(dlg, { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(filter);
+  });
+
+  it("Dismiss in the dialog closes it and removes the task", () => {
+    tasks.set([done]);
+    render(<TaskPanel />);
+    fireEvent.click(screen.getByRole("button", { name: "Show result" }));
+    const dlg = screen.getByRole("dialog");
+    fireEvent.click(within(dlg).getByRole("button", { name: "Dismiss" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(tasks.get()).toHaveLength(0);
+  });
+
+  it("a running task has neither Show result nor Dismiss; an error task keeps Dismiss", () => {
+    tasks.set([{ ...done, state: "running", result: undefined }]);
+    const { rerender } = render(<TaskPanel />);
+    expect(screen.queryByRole("button", { name: "Show result" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Dismiss" })).toBeNull();
+    tasks.set([{ ...done, state: "error", error: "boom", result: undefined }]);
+    rerender(<TaskPanel />);
+    expect(screen.getByRole("button", { name: "Dismiss" })).toBeTruthy();
   });
 });

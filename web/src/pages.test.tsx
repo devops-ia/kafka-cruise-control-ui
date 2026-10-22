@@ -340,10 +340,22 @@ describe("result tables", () => {
     const row = within(t).getByRole("row", { name: /orders/ });
     expect(row.textContent).toContain("0, 1 removed");
     expect(row.textContent).toContain("0, 2 added");
+    fireEvent.click(within(t).getByRole("button", { name: "Filter" }));
     fireEvent.input(within(t).getByLabelText("Filter Topic"), { target: { value: "pay" } });
     expect(within(t).queryByRole("row", { name: /orders/ })).toBeNull();
     expect(within(t).getByRole("row", { name: /payments/ })).toBeTruthy();
     expect(within(t).getByRole("button", { name: "Topic" })).toBeTruthy();
+  });
+
+  it("Proposals shows the stats and Goal results side by side, and only the stats without goals", async () => {
+    await viewProposals(optimization);
+    const stats = document.querySelector("dl.stats") as HTMLElement;
+    expect(stats.parentElement?.className).toContain("two-col");
+    expect(stats.parentElement).toBe(screen.getByRole("region", { name: "Goal results" }).parentElement);
+    cleanup();
+    await viewProposals({ ...optimization, goalSummary: undefined });
+    expect(document.querySelector(".two-col")).toBeNull();
+    expect(screen.queryByRole("region", { name: "Goal results" })).toBeNull();
   });
 
   it("Proposals without proposals or load shows neither table nor an error", async () => {
@@ -396,6 +408,9 @@ describe("result tables", () => {
     const pending = screen.getByRole("region", { name: "Pending intra-broker movements (1)" });
     expect(within(pending).getByRole("row", { name: /payments 0 2/ })).toBeTruthy();
     expect(screen.queryByRole("region", { name: /Completed intra-broker/ })).toBeNull();
+    for (const title of ["In progress intra-broker movements (2)", "Pending intra-broker movements (1)"]) {
+      expect(screen.getByText(title).className).not.toContain("sr-only");
+    }
   });
 
   it("Executor without intra-broker lists shows no such table", async () => {

@@ -19,25 +19,27 @@ export function OptimizationView({ data }: { data: any }) {
   const goals: { goal: string; status: string }[] = data.goalSummary ?? [];
   return (
     <div class="stack">
-      <dl class="stats">
-        {stats.map(([k, v]) => (
-          <div key={k}>
-            <dt>{k}</dt>
-            <dd>{v ?? "-"}</dd>
-          </div>
-        ))}
-      </dl>
-      {goals.length > 0 && (
-        <Table
-          caption="Goal results"
-          rows={goals}
-          filterable={false}
-          columns={[
-            { key: "goal", header: "Goal", value: (g) => g.goal },
-            { key: "status", header: "Status", value: (g) => g.status, render: (g) => <span class={`badge ${g.status === "VIOLATED" ? "bad" : "ok"}`}>{g.status}</span> },
-          ]}
-        />
-      )}
+      <div class={goals.length > 0 ? "two-col" : undefined}>
+        <dl class="stats">
+          {stats.map(([k, v]) => (
+            <div key={k}>
+              <dt>{k}</dt>
+              <dd>{v ?? "-"}</dd>
+            </div>
+          ))}
+        </dl>
+        {goals.length > 0 && (
+          <Table
+            caption="Goal results"
+            rows={goals}
+            filterable={false}
+            columns={[
+              { key: "goal", header: "Goal", value: (g) => g.goal },
+              { key: "status", header: "Status", value: (g) => g.status, render: (g) => <span class={`badge ${g.status === "VIOLATED" ? "bad" : "ok"}`}>{g.status}</span> },
+            ]}
+          />
+        )}
+      </div>
       {Array.isArray(data.proposals) && data.proposals.length > 0 && <MovementTable title="Proposed partition movements" movements={data.proposals} />}
       {data.loadBeforeOptimization && data.loadAfterOptimization && <LoadDiff before={data.loadBeforeOptimization} after={data.loadAfterOptimization} />}
     </div>

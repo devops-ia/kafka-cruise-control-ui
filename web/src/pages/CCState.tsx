@@ -174,23 +174,23 @@ function Anomalies({ d }: { d: any }) {
           ["Self-healing started", num(mt.numSelfHealingStarted)],
           ["Self-healing failed to start", num(mt.numSelfHealingFailedToStart)]]} />
       </Panel>
-      <Panel title="Recent anomalies" aside={<span class="mono muted">{rows.length}</span>}>
-        {rows.length === 0 ? (
+      {rows.length === 0 ? (
+        <Panel title="Recent anomalies">
           <p class="muted">No recent anomalies.</p>
-        ) : (
-          <Table
-            caption="Recent anomalies"
-            rows={rows}
-            filterable={false}
-            columns={[
-              { key: "type", header: "Type", value: (r) => r.type },
-              { key: "id", header: "Anomaly id", value: (r) => r.id, render: (r) => <span class="mono">{r.id}</span> },
-              { key: "status", header: "Status", value: (r) => r.status, render: (r) => tag(r.status) },
-              { key: "at", header: "Detected", value: (r) => r.at ?? 0, render: (r) => (r.at ? formatTime(r.at) : "") },
-            ]}
-          />
-        )}
-      </Panel>
+        </Panel>
+      ) : (
+        <Table
+          caption="Recent anomalies"
+          rows={rows}
+          filterable={false}
+          columns={[
+            { key: "type", header: "Type", value: (r) => r.type },
+            { key: "id", header: "Anomaly id", value: (r) => r.id, render: (r) => <span class="mono">{r.id}</span> },
+            { key: "status", header: "Status", value: (r) => r.status, render: (r) => tag(r.status) },
+            { key: "at", header: "Detected", value: (r) => r.at ?? 0, render: (r) => (r.at ? formatTime(r.at) : "") },
+          ]}
+        />
+      )}
       <AllFields data={d} />
     </div>
   );
