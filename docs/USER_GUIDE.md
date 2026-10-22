@@ -126,7 +126,7 @@ The list of tasks Cruise Control knows about: when they started, status, the req
 
 Operations that take time (HTTP 202 with a `User-Task-ID`) appear in an "Operations" panel in the corner, on every page, so you can keep navigating. Each entry shows the endpoint and cluster, a "dry run" mark, a state (running, done, error or waiting for review), the User-Task-ID and, while running, the latest progress step and percentage. It checks again every two seconds until Cruise Control finishes.
 
-Done entries have "Show result", which expands the same result view as Proposals. Operations that return proposals send `verbose=true`, which is what makes the movement and load tables appear there. Entries that are not running have "Dismiss". The panel is kept in the browser's memory only: a reload clears it, but the task itself continues in Cruise Control and stays in User tasks.
+Entries with a result have "Show result", which opens it in a large window with the same result view as Proposals. The window header, with the endpoint, cluster, "Close" and "Dismiss", stays visible while the body scrolls. "Close" (or Escape) closes the window and keeps the task in the panel; "Dismiss" closes it and removes the task. Operations that return proposals send `verbose=true`, which is what makes the movement and load tables appear there. Entries that are not running have "Dismiss". The panel is kept in the browser's memory only: a reload clears it, but the task itself continues in Cruise Control and stays in User tasks.
 
 ## What a viewer sees
 
