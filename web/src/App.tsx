@@ -17,6 +17,7 @@ import { UserTasks } from "./pages/UserTasks";
 import { Link, navigate, path } from "./router";
 import { isAdmin, refreshSession, useSession } from "./session";
 import { applyTheme, cluster as clusterStore, setCluster, setTheme, theme, useStore, type Theme } from "./store";
+import { probeTwoStep, twoStep } from "./twostep";
 
 interface Route {
   path: string;
@@ -109,6 +110,7 @@ function Shell({ children }: { children: ComponentChildren }) {
   const s = useSession();
   const current = useStore(path);
   const t = useStore(theme);
+  const off = useStore(twoStep)[useStore(clusterStore)] === "off";
   return (
     <div class="shell">
       <a class="skip" href="#main">
@@ -119,7 +121,7 @@ function Shell({ children }: { children: ComponentChildren }) {
           <span class="mark" aria-hidden="true" />
           Cruise Control
         </div>
-        {GROUPS.map((g) => ({ g, routes: ROUTES.filter((r) => r.group === g && (!r.admin || isAdmin(s))) }))
+        {GROUPS.map((g) => ({ g, routes: ROUTES.filter((r) => r.group === g && (!r.admin || isAdmin(s)) && !(off && r.path === "/review")) }))
           .filter(({ routes }) => routes.length > 0)
           .map(({ g, routes }) => (
             <div key={g}>
@@ -183,6 +185,10 @@ export function App() {
   useEffect(() => {
     if (s?.authenticated) loadClusters().catch((e: Error) => setFailed(e.message));
   }, [s?.authenticated]);
+  // Admin only: the proxy refuses review_board to a viewer. Runs again on every cluster change.
+  useEffect(() => {
+    if (s?.authenticated && isAdmin(s) && selected) probeTwoStep(selected);
+  }, [s?.authenticated, s?.role, selected]);
   useEffect(() => {
     if (s?.authenticated && (current === "/" || !ROUTES.some((r) => r.path === current))) navigate("/summary");
   }, [s?.authenticated, current]);

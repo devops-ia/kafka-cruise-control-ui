@@ -118,6 +118,8 @@ When it is enabled, running an operation does not execute it. The task panel sho
 
 When two-step verification is disabled, Cruise Control refuses `review_board` and the page says "Two-step verification is disabled on this cluster, so there is nothing to review" with the setting to change. That is not an error. The page needs the admin role.
 
+The menu hides Peer review on a cluster where two-step verification is off. For an admin the UI asks Cruise Control once after sign-in and again each time you pick another cluster, so the entry follows the selected cluster without a reload. If that check fails (network error, 502, 504, 401 or any other answer), the entry stays visible. Opening `/review` by its address still shows the notice above; the hidden entry is a convenience and not an access control.
+
 ## User tasks
 
 The list of tasks Cruise Control knows about: when they started, status, the request, the client and the User-Task-ID. Use it to find an operation that was started from another browser, or after you reloaded the page, which empties the task panel.
@@ -130,6 +132,6 @@ Entries with a result have "Show result", which opens it in a large window with 
 
 ## What a viewer sees
 
-A viewer has no Proposals, Admin, Peer review or User tasks in the menu. The pages in Overview and Load work as for an admin, including Config insights. If a viewer opens an admin address directly, the page shows a "403 Forbidden" message ("Your role (viewer) cannot open Admin. It needs the admin role.") and sends no request to the server. The server refuses those requests as well, so the menu is a convenience and not the control.
+A viewer has no Proposals, Admin, Peer review or User tasks in the menu. The pages in Overview and Load work as for an admin, including Config insights. If a viewer opens an admin address directly, the page shows a "403 Forbidden" message ("Your role (viewer) cannot open Admin. It needs the admin role.") and sends no request to the server. A viewer never triggers the two-step check either, so the menu does not change. The server refuses those requests as well, so the menu is a convenience and not the control.
 
 ![Forbidden](assets/screenshots/forbidden.png)
