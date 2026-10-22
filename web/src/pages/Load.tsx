@@ -9,17 +9,24 @@ import { useResource } from "../hooks";
 
 const num = (v: unknown) => (typeof v === "number" ? v : 0);
 
+// break long hostnames after dots only
+const Host = ({ name }: { name: string }) => (
+  <span class="host">
+    {String(name).split(".").flatMap((p, i, a) => (i < a.length - 1 ? [p, ".", <wbr />] : [p]))}
+  </span>
+);
+
 function cols(kind: "broker" | "host"): Column<any>[] {
   const lead: Column<any>[] =
     kind === "broker"
       ? [
           { key: "Broker", header: "Broker", value: (r) => r.Broker, numeric: true },
-          { key: "Host", header: "Host", value: (r) => r.Host },
+          { key: "Host", header: "Host", value: (r) => r.Host, render: (r) => <Host name={r.Host} /> },
           { key: "Rack", header: "Rack", value: (r) => r.Rack ?? "" },
           { key: "BrokerState", header: "State", value: (r) => r.BrokerState ?? "" },
         ]
       : [
-          { key: "Host", header: "Host", value: (r) => r.Host },
+          { key: "Host", header: "Host", value: (r) => r.Host, render: (r) => <Host name={r.Host} /> },
           { key: "Rack", header: "Rack", value: (r) => r.Rack ?? "" },
         ];
   return [

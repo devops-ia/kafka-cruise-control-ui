@@ -14,7 +14,7 @@ In `local` mode the login asks for a user name and a password. A wrong password 
 
 **Auto-refresh.** Pages that load data have a Refresh button and an Auto-refresh selector: Off, 10 s, 30 s, 1 min or 5 min. The setting is shared by all pages and remembered. It is off by default. Auto-refresh counts as activity for the session idle timeout, so a page left open on auto-refresh never signs you out for being idle.
 
-**Tables.** Click a column header to sort, click again to reverse. Most tables have a filter box under each header. Typing narrows the rows by that column.
+**Tables.** Click a column header to sort, click again to reverse. Every table shows its title above it. Most tables have a "Filter" button next to the title; it opens a filter box under each header, and typing narrows the rows by that column. The boxes stay open while any of them has text, so rows are never hidden without a visible filter.
 
 ## Summary
 
@@ -65,7 +65,7 @@ The heaviest partitions for one resource. "Sort by" takes cpu, networkInbound, n
 
 ## Proposals
 
-Asks Cruise Control for the proposal it would make with its default goals, and shows replica movements, data to move, leader movements, intra-broker movements, the balancedness score before and after, a table of goals with a VIOLATED mark where one could not be met, and two blocks that come from the verbose answer. "Proposed partition movements (n)" is a table with topic, partition, old replicas and new replicas; it sorts, filters by topic, and marks removed and added replicas with colour, and also with hidden text ("removed", "added") for screen readers. "Load before and after by broker" (switch to "By host" with the tabs) shows each value before and after with the signed change, for example `80 → 70 -12.5%`; a broker that was not in the earlier load shows only its new value. When the brokers report per-disk data, a "Load by disk" table adds one row per broker and log dir (a dead disk shows DEAD). A block is left out when Cruise Control does not send its data. The "Intra-broker rebalance disk proposal" box asks again with `rebalance_disk=true`; it stays on screen and focused while the page reloads. Nothing is executed. This page needs the admin role.
+Asks Cruise Control for the proposal it would make with its default goals, and shows replica movements, data to move, leader movements, intra-broker movements, the balancedness score before and after (the table of goals, with a VIOLATED mark where one could not be met, sits next to these figures on wide screens and below them on narrow ones), and two blocks that come from the verbose answer. "Proposed partition movements (n)" is a table with topic, partition, old replicas and new replicas; it sorts, filters by topic, and marks removed and added replicas with colour, and also with hidden text ("removed", "added") for screen readers. "Load before and after by broker" (switch to "By host" with the tabs) shows each value before and after with the signed change, for example `80 → 70 -12.5%`; a broker that was not in the earlier load shows only its new value. When the brokers report per-disk data, a "Load by disk" table adds one row per broker and log dir (a dead disk shows DEAD). A block is left out when Cruise Control does not send its data. The "Intra-broker rebalance disk proposal" box asks again with `rebalance_disk=true`; it stays on screen and focused while the page reloads. Nothing is executed. This page needs the admin role.
 
 ## Admin
 
