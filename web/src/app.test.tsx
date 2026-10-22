@@ -1,12 +1,14 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/preact";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/preact";
 import { App } from "./App";
 import { load } from "./fixtures";
 import { navigate } from "./router";
 import { session } from "./session";
 import { setCluster } from "./store";
+import { twoStep } from "./twostep";
 import { mockFetch } from "./testutil";
 
 afterEach(() => {
+  twoStep.set({});
   cleanup();
   vi.unstubAllGlobals();
   session.set(undefined);
@@ -112,5 +114,66 @@ describe("App", () => {
     asRole("admin", "none");
     render(<App />);
     expect((await links()).length).toBe(10);
+  });
+
+  describe("Peer review in the sidebar", () => {
+    const OFF = { status: 403, body: { errorMessage: "Cannot process GET request due to: 'Attempt to access REVIEW_BOARD endpoint without enabling 'two.step.verification.enabled' config.'." } };
+    const setup = (role: "viewer" | "admin", review: (cluster: string) => { status?: number; body?: unknown }) => {
+      localStorage.clear();
+      setCluster("a");
+      return mockFetch((c) => {
+        if (c.path === "/api/session") return { body: { authenticated: true, mode: "local", user: "leo", role, csrfToken: "t" } };
+        if (c.path === "/api/clusters") return { body: [{ name: "a" }, { name: "b" }] };
+        const m = c.path.match(/^\/api\/clusters\/(\w+)\/proxy\/review_board$/);
+        if (m) return review(m[1]);
+        return { body: {} };
+      });
+    };
+    const hasReview = async () => (await links()).includes("Peer review");
+
+    it("hides Peer review when two-step verification is off and keeps the other Operations entries", async () => {
+      setup("admin", () => OFF);
+      navigate("/summary");
+      render(<App />);
+      await waitFor(async () => expect(await hasReview()).toBe(false));
+      expect(await links()).toEqual(["Summary", "Cluster state", "Cruise Control state", "Config insights", "Load", "Partition load", "Proposals", "Admin", "User tasks"]);
+    });
+
+    it("follows the selected cluster without a reload", async () => {
+      setup("admin", (cl) => (cl === "a" ? OFF : { body: { RequestInfo: [] } }));
+      navigate("/summary");
+      render(<App />);
+      await waitFor(async () => expect(await hasReview()).toBe(false));
+      fireEvent.change(screen.getByLabelText("Cluster"), { target: { value: "b" } });
+      await waitFor(async () => expect(await hasReview()).toBe(true));
+      fireEvent.change(screen.getByLabelText("Cluster"), { target: { value: "a" } });
+      await waitFor(async () => expect(await hasReview()).toBe(false));
+    });
+
+    it.each([502, 504, 401, 500])("keeps Peer review when the probe fails with %s", async (status) => {
+      const calls = setup("admin", () => ({ status, body: { error: "x" } }));
+      navigate("/summary");
+      render(<App />);
+      await waitFor(() => expect(calls.some((c) => c.path.endsWith("/proxy/review_board"))).toBe(true));
+      await new Promise((r) => setTimeout(r, 20));
+      expect(await hasReview()).toBe(true);
+    });
+
+    it("does not probe for a viewer", async () => {
+      const calls = setup("viewer", () => OFF);
+      navigate("/summary");
+      render(<App />);
+      await links();
+      await new Promise((r) => setTimeout(r, 20));
+      expect(calls.filter((c) => c.path.endsWith("/proxy/review_board"))).toEqual([]);
+    });
+
+    it("still shows the notice on /review when the menu entry is hidden", async () => {
+      setup("admin", () => OFF);
+      navigate("/review");
+      render(<App />);
+      expect(await screen.findByText(/Two-step verification is disabled on this cluster/)).toBeTruthy();
+      await waitFor(async () => expect(await hasReview()).toBe(false));
+    });
   });
 });

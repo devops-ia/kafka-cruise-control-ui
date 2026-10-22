@@ -1,4 +1,3 @@
-import { ApiError } from "../api";
 import { Async, RefreshBar } from "../components/Async";
 import { Table } from "../components/Table";
 import { formatTime } from "../format";
@@ -6,6 +5,7 @@ import { useResource } from "../hooks";
 import { parseEndpointWithParams } from "../ops";
 import { cluster as clusterStore, useStore } from "../store";
 import { runTask } from "../tasks";
+import { isTwoStepDisabled } from "../twostep";
 
 
 function Actions({ r, reload }: { r: any; reload: () => void }) {
@@ -43,8 +43,7 @@ function Actions({ r, reload }: { r: any; reload: () => void }) {
 
 export function PeerReview() {
   const res = useResource("review_board");
-  // CC refuses review_board when two-step verification is off (a 403 today); the status is not worth pinning, the message is.
-  if (res.error instanceof ApiError && /two\.step\.verification/i.test(res.error.message) && !res.data) {
+  if (isTwoStepDisabled(res.error) && !res.data) {
     return (
       <section aria-labelledby="page-title" class="stack">
         <div class="page-head">
