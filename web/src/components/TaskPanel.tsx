@@ -1,15 +1,25 @@
-import { useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import { dismissTask, useTasks } from "../tasks";
+import { ResultDialog } from "./Dialog";
 import { OptimizationView } from "./Results";
 
 /** Global list of asynchronous operations. It lives outside the pages, so tasks stay visible while navigating. */
 export function TaskPanel() {
   const tasks = useTasks();
   const [open, setOpen] = useState<number | undefined>();
+  const heading = useRef<HTMLHeadingElement>(null);
+  const refocus = useRef(false);
+  // The opener is gone after Dismiss in the dialog; park focus on the panel heading instead of the body.
+  useEffect(() => {
+    if (refocus.current) heading.current?.focus();
+    refocus.current = false;
+  });
   if (tasks.length === 0) return null;
   return (
     <aside class="task-panel" aria-label="Operations">
-      <h2>Operations</h2>
+      <h2 ref={heading} tabIndex={-1}>
+        Operations
+      </h2>
       <ul>
         {tasks.map((t) => (
           <li key={t.id} class={`task ${t.state}`}>
@@ -30,8 +40,8 @@ export function TaskPanel() {
             {t.error && <div class="state error">{t.error}</div>}
             <div class="task-actions">
               {t.result !== undefined && (
-                <button type="button" aria-expanded={open === t.id} onClick={() => setOpen(open === t.id ? undefined : t.id)}>
-                  {open === t.id ? "Hide result" : "Show result"}
+                <button type="button" onClick={() => setOpen(t.id)}>
+                  Show result
                 </button>
               )}
               {t.state !== "running" && (
@@ -40,7 +50,27 @@ export function TaskPanel() {
                 </button>
               )}
             </div>
-            {open === t.id && <OptimizationView data={t.result} />}
+            {open === t.id && (
+              <ResultDialog
+                title={
+                  <>
+                    {t.endpoint} on {t.cluster}
+                    {t.dryrun === "true" && <span class="badge">dry run</span>}
+                  </>
+                }
+                onClose={() => setOpen(undefined)}
+                onDismiss={
+                  t.state !== "running"
+                    ? () => {
+                        refocus.current = true;
+                        dismissTask(t.id);
+                      }
+                    : undefined
+                }
+              >
+                <OptimizationView data={t.result} />
+              </ResultDialog>
+            )}
           </li>
         ))}
       </ul>
