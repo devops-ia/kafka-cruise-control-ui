@@ -26,6 +26,9 @@ export function Table<R>(props: { caption: string; columns: Column<R>[]; rows: R
   const { columns, rows } = props;
   const [sort, setSort] = useState<{ col: string; dir: "asc" | "desc" } | undefined>();
   const [filters, setFilters] = useState<Record<string, string>>({});
+  const [open, setOpen] = useState(false);
+  const filterable = props.filterable !== false;
+  const showFilters = filterable && (open || Object.values(filters).some((f) => f));
 
   const shown = useMemo(() => {
     const filtered = rows.filter((r) =>
@@ -45,8 +48,17 @@ export function Table<R>(props: { caption: string; columns: Column<R>[]; rows: R
 
   return (
     <div class="table-wrap" role="region" aria-label={props.caption} tabIndex={0}>
-      <table>
-        <caption class="sr-only">{props.caption}</caption>
+      <table aria-label={props.caption}>
+        <caption>
+          <div class="caption-row">
+            <span class="table-title">{props.caption}</span>
+            {filterable && (
+              <button type="button" aria-expanded={showFilters} onClick={() => setOpen(!showFilters)}>
+                Filter
+              </button>
+            )}
+          </div>
+        </caption>
         <thead>
           <tr>
             {columns.map((c) => (
@@ -58,7 +70,7 @@ export function Table<R>(props: { caption: string; columns: Column<R>[]; rows: R
               </th>
             ))}
           </tr>
-          {props.filterable !== false && (
+          {showFilters && (
             <tr class="filters">
               {columns.map((c) => (
                 <td key={c.key}>
