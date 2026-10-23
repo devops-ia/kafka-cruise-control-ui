@@ -140,6 +140,7 @@ function Shell({ children }: { children: ComponentChildren }) {
         <div class="who">
           <span>{s?.user}</span> <span class="badge">{s?.role}</span>
         </div>
+        <div class="version">{import.meta.env.VITE_VERSION || "dev"}</div>
       </nav>
       <header class="topbar">
         <ClusterSelect />

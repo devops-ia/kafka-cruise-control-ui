@@ -16,7 +16,9 @@ COPY web/package.json web/package-lock.json ./
 RUN npm ci
 
 COPY web/ ./
-RUN npm run build
+# Release tag shown in the sidebar; CI passes it, a local build shows "dev".
+ARG VERSION=dev
+RUN VITE_VERSION="${VERSION}" npm run build
 
 ###
 # build stage

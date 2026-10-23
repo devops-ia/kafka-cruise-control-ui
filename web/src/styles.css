@@ -238,6 +238,12 @@ h2 {
   border-top: 1px solid var(--rail-active);
   overflow-wrap: anywhere;
 }
+.version {
+  padding: var(--s2) var(--s4);
+  border-top: 1px solid var(--rail-active);
+  color: var(--rail-label);
+  font: 11px var(--mono);
+}
 .sidebar .badge {
   background: var(--rail-active);
   color: var(--rail-text);

@@ -201,7 +201,7 @@ CCUI_AUTH_MODE=none CCUI_CLUSTERS__0__NAME=local CCUI_CLUSTERS__0__URL=http://lo
 
 For SPA work, `cd web && npm run dev` starts Vite on port 5173 and proxies `/api` to a server on port 8080. `npm run typecheck` and `npm test` run the type checks and the unit tests.
 
-`docker build -t kafka-cruise-control-ui .` runs the same three stages as CI: Node builds the SPA, Go builds the binary with the SPA embedded, and the result is copied into a distroless non-root image.
+`docker build -t kafka-cruise-control-ui .` runs the same three stages as CI: Node builds the SPA, Go builds the binary with the SPA embedded, and the result is copied into a distroless non-root image. The sidebar shows `dev` as the version unless you pass one, for example `--build-arg VERSION=v1.4.0`; CI passes the release tag.
 
 The frozen LinkedIn UI can still be built locally with `docker build --target legacy`; see [Legacy UI](docs/DEPLOYMENT.md#legacy-ui).
 
