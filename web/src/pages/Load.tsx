@@ -10,7 +10,7 @@ import { useResource } from "../hooks";
 const num = (v: unknown) => (typeof v === "number" ? v : 0);
 
 // break long hostnames after dots only
-const Host = ({ name }: { name: string }) => (
+export const Host = ({ name }: { name: string }) => (
   <span class="host">
     {String(name).split(".").flatMap((p, i, a) => (i < a.length - 1 ? [p, ".", <wbr />] : [p]))}
   </span>

@@ -228,6 +228,16 @@ describe("Config insights", () => {
     expect(screen.queryByText(/Security is disabled/)).toBeNull();
   });
 
+  it("pages the configured clusters", async () => {
+    permissions(200, { version: 1, role: "ADMIN" });
+    clusters.set(Array.from({ length: 12 }, (_, i) => ({ name: `c${i}` })));
+    render(<ConfigInsights />);
+    const table = screen.getByRole("table", { name: "Configured clusters" });
+    expect(within(table).getAllByRole("row")).toHaveLength(11);
+    expect(screen.getByText("Page 1 of 2")).toBeTruthy();
+    expect(screen.getByLabelText("Rows per page")).toBeTruthy();
+  });
+
   it("shows the roles on a 200", async () => {
     permissions(200, { version: 1, role: "ADMIN" });
     render(<ConfigInsights />);
@@ -333,9 +343,21 @@ describe("result tables", () => {
     await screen.findByText("Replica movements");
     return calls;
   };
+  const block = (summary: string) => screen.getByText(summary, { selector: "summary" }).closest("details")!;
+  // Opens a closed block and returns it.
+  const expand = (summary: string) => {
+    const d = block(summary);
+    expect(d.open).toBe(false);
+    d.open = true;
+    return d;
+  };
 
   it("Proposals lists partition movements, marks removed and added replicas, and filters by topic", async () => {
     await viewProposals();
+    const load = expand("Load before and after");
+    const details = expand("Proposed partition movements (2)");
+    expect(load.compareDocumentPosition(details) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(load).getByRole("region", { name: "Load before and after by broker" })).toBeTruthy();
     const t = screen.getByRole("region", { name: "Proposed partition movements (2)" });
     const row = within(t).getByRole("row", { name: /orders/ });
     expect(row.textContent).toContain("0, 1 removed");
@@ -362,16 +384,22 @@ describe("result tables", () => {
     await viewProposals(optimization);
     expect(screen.queryByRole("region", { name: /Proposed partition movements/ })).toBeNull();
     expect(screen.queryByRole("region", { name: /Load by/ })).toBeNull();
+    expect(screen.queryByText("Load before and after", { selector: "summary" })).toBeNull();
+    expect(screen.queryByText(/Load by disk/, { selector: "summary" })).toBeNull();
     cleanup();
     await viewProposals({ ...optimization, proposals: [] });
     expect(screen.queryByRole("region", { name: /Proposed partition movements/ })).toBeNull();
+    expect(screen.queryByText(/Proposed partition movements/, { selector: "summary" })).toBeNull();
   });
 
   it("Load diff shows before, after and a signed change per broker, with units, and a new broker without a percentage", async () => {
     await viewProposals();
+    expand("Load before and after");
     const t = screen.getByRole("region", { name: "Load before and after by broker" });
     const row = within(t).getByRole("row", { name: /kafka-1/ });
     for (const x of ["80", "70", "-12.5%", "75%", "50%", "-33.3%", "5 GiB", "4 GiB", "400 KiB/s", "300 KiB/s"]) expect(within(row).getByText(x)).toBeTruthy();
+    expect(within(row).getByText("-12.5%").classList.contains("down")).toBe(true);
+    expect(row.textContent).not.toContain("→");
     const fresh = within(t).getByRole("row", { name: /kafka-2/ });
     expect(fresh.textContent).not.toContain("%-");
     expect(within(fresh).getByText("10")).toBeTruthy();
@@ -379,12 +407,29 @@ describe("result tables", () => {
   });
 
   it("Load diff shows an increase with +, switches to hosts, and lists disks with DEAD as text", async () => {
-    await viewProposals({ ...optimizationVerbose, loadBeforeOptimization: { ...optimizationVerbose.loadBeforeOptimization, brokers: [{ Broker: 1, Host: "kafka-1", Replicas: 70 }] }, loadAfterOptimization: { brokers: [{ Broker: 1, Host: "kafka-1", Replicas: 77, DiskState: { "/data/b": { NumReplicas: 1, NumLeaderReplicas: 0, DiskMB: 0, DiskPct: "DEAD" } } }], hosts: [{ Host: "kafka-1", Replicas: 70 }] } });
-    expect(within(screen.getByRole("row", { name: /kafka-1/ })).getByText("+10.0%")).toBeTruthy();
+    await viewProposals({ ...optimizationVerbose, loadBeforeOptimization: { ...optimizationVerbose.loadBeforeOptimization, brokers: [{ Broker: 1, Host: "kafka-1", Replicas: 70, Leaders: 5 }] }, loadAfterOptimization: { brokers: [{ Broker: 1, Host: "kafka-1", Replicas: 77, Leaders: 5, DiskState: { "/data/b": { NumReplicas: 1, NumLeaderReplicas: 0, DiskMB: 0, DiskPct: "DEAD" } } }], hosts: [{ Host: "kafka-1", Replicas: 70 }] } });
+    expand("Load before and after");
+    const row = screen.getByRole("row", { name: /kafka-1/ });
+    expect(within(row).getByText("+10.0%").classList.contains("up")).toBe(true);
+    const same = within(row).getByText("0.0%").classList;
+    expect([same.contains("muted"), same.contains("up"), same.contains("down")]).toEqual([true, false, false]);
+    const disk = expand("Load by disk (1)");
+    expect(block("Load before and after").compareDocumentPosition(disk) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(disk.compareDocumentPosition(block("Proposed partition movements (2)")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     const disks = screen.getByRole("region", { name: "Load by disk" });
     expect(within(within(disks).getByRole("row", { name: /\/data\/b/ })).getByText("DEAD")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "By host" }));
     expect(screen.getByRole("region", { name: "Load before and after by host" })).toBeTruthy();
+  });
+
+  it("Load diff breaks FQDN hosts after the dots by broker and by host", async () => {
+    const fqdn = "kafka-prod-0.kafka-prod-brokers.kafka.svc.cluster.local";
+    await viewProposals({ ...optimizationVerbose, loadAfterOptimization: { brokers: [{ Broker: 0, Host: fqdn, Replicas: 10 }], hosts: [{ Host: fqdn, Replicas: 10 }] } });
+    expand("Load before and after");
+    const hostCell = (region: string) => within(screen.getByRole("region", { name: region })).getByRole("row", { name: /kafka-prod-0/ }).querySelector(".host");
+    expect(hostCell("Load before and after by broker")?.querySelector("wbr")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "By host" }));
+    expect(hostCell("Load before and after by host")?.querySelector("wbr")).toBeTruthy();
   });
 
   it("Proposals sends rebalance_disk only when the box is checked and keeps the box focused", async () => {

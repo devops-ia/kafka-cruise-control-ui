@@ -69,6 +69,71 @@ describe("Table", () => {
     expect(screen.getByRole("table", { name: "Brokers" })).toBeTruthy();
   });
 
+  describe("pageable", () => {
+    const many: Row[] = Array.from({ length: 25 }, (_, i) => ({ broker: `b-${String(i + 1).padStart(2, "0")}`, disk: i }));
+    const brokers = () => within(screen.getAllByRole("rowgroup")[1]).getAllByRole("row").map((r) => r.firstElementChild!.textContent);
+
+    it("shows 10 rows, pages with Next, and announces the page", () => {
+      render(<Table caption="Brokers" columns={columns} rows={many} pageable />);
+      expect(brokers()).toHaveLength(10);
+      const status = screen.getByText("Page 1 of 3");
+      expect(status.getAttribute("aria-live")).toBe("polite");
+      expect((screen.getByRole("button", { name: "Previous" }) as HTMLButtonElement).disabled).toBe(true);
+      fireEvent.click(screen.getByRole("button", { name: "Next" }));
+      expect(brokers()).toEqual(many.slice(10, 20).map((r) => r.broker));
+      expect(screen.getByText("Page 2 of 3")).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: "Next" }));
+      expect((screen.getByRole("button", { name: "Next" }) as HTMLButtonElement).disabled).toBe(true);
+    });
+
+    it("shows every row and no pager with All", () => {
+      render(<Table caption="Brokers" columns={columns} rows={many} pageable />);
+      fireEvent.change(screen.getByLabelText("Rows per page"), { target: { value: "all" } });
+      expect(brokers()).toHaveLength(25);
+      expect(screen.queryByRole("button", { name: "Previous" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Next" })).toBeNull();
+      expect(screen.queryByText(/^Page /)).toBeNull();
+    });
+
+    it("has no pager when one page holds every row", () => {
+      render(<Table caption="Brokers" columns={columns} rows={many} pageable />);
+      fireEvent.change(screen.getByLabelText("Rows per page"), { target: { value: "30" } });
+      expect(brokers()).toHaveLength(25);
+      expect(screen.queryByText(/^Page /)).toBeNull();
+    });
+
+    it("goes back to page 1 when a filter changes", () => {
+      render(<Table caption="Brokers" columns={columns} rows={many} pageable />);
+      fireEvent.click(screen.getByRole("button", { name: "Next" }));
+      fireEvent.click(screen.getByRole("button", { name: "Filter" }));
+      fireEvent.input(screen.getByLabelText("Filter Broker"), { target: { value: "b-" } });
+      expect(screen.getByText("Page 1 of 3")).toBeTruthy();
+      expect(brokers()[0]).toBe("b-01");
+    });
+
+    it("goes back to page 1 when the sort changes", () => {
+      render(<Table caption="Brokers" columns={columns} rows={many} pageable />);
+      fireEvent.click(screen.getByRole("button", { name: "Next" }));
+      fireEvent.click(screen.getByRole("button", { name: /Disk/ }));
+      expect(screen.getByText("Page 1 of 3")).toBeTruthy();
+      expect(brokers()[0]).toBe("b-01");
+    });
+
+    it("goes back to page 1 when rows per page changes", () => {
+      render(<Table caption="Brokers" columns={columns} rows={many} pageable />);
+      fireEvent.click(screen.getByRole("button", { name: "Next" }));
+      fireEvent.change(screen.getByLabelText("Rows per page"), { target: { value: "15" } });
+      expect(screen.getByText("Page 1 of 2")).toBeTruthy();
+      expect(brokers()[0]).toBe("b-01");
+    });
+
+    it("is off by default", () => {
+      render(<Table caption="Brokers" columns={columns} rows={many} />);
+      expect(brokers()).toHaveLength(25);
+      expect(screen.queryByLabelText("Rows per page")).toBeNull();
+    });
+  });
+
   it("shows bytes with units", () => {
     render(<Table caption="Brokers" columns={columns} rows={[rows[1]]} />);
     expect(screen.getByText("1 GiB")).toBeTruthy();

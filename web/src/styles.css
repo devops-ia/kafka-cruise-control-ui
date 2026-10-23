@@ -408,6 +408,26 @@ label {
 .cluster-select select {
   font-family: var(--mono);
 }
+/* Chromium base-select: the list opens below the control from the first group instead of over the chosen option. */
+#cluster,
+#cluster::picker(select) {
+  appearance: base-select;
+}
+#cluster::picker(select) {
+  max-height: 60vh;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+#cluster optgroup {
+  font-weight: 600;
+  color: var(--muted);
+}
+#cluster option {
+  font-weight: normal;
+  color: var(--ink);
+}
 
 /* Data */
 .table-wrap {
@@ -430,6 +450,13 @@ caption .caption-row {
   display: flex;
   align-items: center;
   gap: var(--s3);
+}
+.pager {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s3);
+  padding: var(--s2) var(--s3);
 }
 th,
 td {
@@ -489,6 +516,12 @@ tr.nested td {
 }
 .muted {
   color: var(--muted);
+}
+.up {
+  color: var(--bad);
+}
+.down {
+  color: var(--ok);
 }
 .mono {
   font-family: var(--mono);
@@ -750,9 +783,31 @@ progress.bar::-moz-progress-bar {
 
 /* Admin */
 .op-tabs {
-  flex-wrap: nowrap;
-  overflow-x: auto;
+  align-items: flex-end;
+  border-bottom: 0;
+  column-gap: var(--s5);
+  row-gap: var(--s3);
   margin-bottom: var(--s4);
+}
+.op-group {
+  display: flex;
+  flex-direction: column;
+}
+.op-group:last-child {
+  margin-left: auto; /* Stop execution sits at the right end */
+}
+.op-group-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--line); /* one baseline per group, so the active underline sits on it in every wrapped row */
+}
+.op-group-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0 var(--s4);
 }
 .op-tabs button {
   flex: none;

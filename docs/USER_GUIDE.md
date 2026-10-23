@@ -51,7 +51,7 @@ The first row shows the executor, the monitor, the analyzer (proposal ready or n
 
 ## Config insights
 
-Shows what the browser may know about the setup and nothing more: your user name, role and authentication mode, the table of configured clusters (name and group) and the permissions Cruise Control reports for the selected cluster. When that Cruise Control runs without security the page says so instead of showing an error. It never shows a URL or a credential.
+Shows what the browser may know about the setup and nothing more: your user name, role and authentication mode, the table of configured clusters (name and group; 10 rows per page, "Rows per page" switches to 15, 30 or All) and the permissions Cruise Control reports for the selected cluster. When that Cruise Control runs without security the page says so instead of showing an error. It never shows a URL or a credential.
 
 ![Config insights](assets/screenshots/config-insights.png)
 
@@ -65,11 +65,11 @@ The heaviest partitions for one resource. "Sort by" takes cpu, networkInbound, n
 
 ## Proposals
 
-Asks Cruise Control for the proposal it would make with its default goals, and shows replica movements, data to move, leader movements, intra-broker movements, the balancedness score before and after (the table of goals, with a VIOLATED mark where one could not be met, sits next to these figures on wide screens and below them on narrow ones), and two blocks that come from the verbose answer. "Proposed partition movements (n)" is a table with topic, partition, old replicas and new replicas; it sorts, filters by topic, and marks removed and added replicas with colour, and also with hidden text ("removed", "added") for screen readers. "Load before and after by broker" (switch to "By host" with the tabs) shows each value before and after with the signed change, for example `80 → 70 -12.5%`; a broker that was not in the earlier load shows only its new value. When the brokers report per-disk data, a "Load by disk" table adds one row per broker and log dir (a dead disk shows DEAD). A block is left out when Cruise Control does not send its data. The "Intra-broker rebalance disk proposal" box asks again with `rebalance_disk=true`; it stays on screen and focused while the page reloads. Nothing is executed. This page needs the admin role.
+Asks Cruise Control for the proposal it would make with its default goals, and shows replica movements, data to move, leader movements, intra-broker movements, the balancedness score before and after (the table of goals, with a VIOLATED mark where one could not be met, sits next to these figures on wide screens and below them on narrow ones), and up to three blocks that come from the verbose answer. Each block is folded and closed when the page opens; click its title to open it. They come in this order. "Load before and after" holds the "Load before and after by broker" table (switch to "By host" with the tabs). Each cell shows the value before, the value after and the signed change, one per line, for example 80, then 70, then -12.5%; an increase and a decrease have different colours, and the sign is always in the text. A broker that was not in the earlier load shows only its new value. Long host names break after the dots. When the brokers report per-disk data, "Load by disk (n)" adds one row per broker and log dir (a dead disk shows DEAD). Last, "Proposed partition movements (n)" is a table with topic, partition, old replicas and new replicas; it sorts, filters by topic, and marks removed and added replicas with colour, and also with hidden text ("removed", "added") for screen readers. The tables in these blocks show 10 rows per page; "Rows per page" switches to 15, 30 or All, and "Previous" and "Next" move between pages. The count in each title is always the total. A block is left out when Cruise Control does not send its data. The "Intra-broker rebalance disk proposal" box asks again with `rebalance_disk=true`; it stays on screen and focused while the page reloads. Nothing is executed. This page needs the admin role.
 
 ## Admin
 
-Each operation has its own tab. The form shows a title, a description, the parameters (required ones are marked `*`) and an actions bar. Leave a field empty to leave the parameter out. Use the left and right arrow keys, Home and End to move between tabs.
+Each operation has its own tab. The tabs sit in groups, in this order: Rebalance, Disks, Brokers, Replicas, then Self-healing and concurrency on its own, Sampling, and Stop execution on its own at the right end. The form shows a title, a description, the parameters (required ones are marked `*`) and an actions bar. Leave a field empty to leave the parameter out. Use the left and right arrow keys, Home and End to move between tabs; the arrows go through every tab in the order above, across the groups.
 
 ![Admin](assets/screenshots/admin.png)
 
@@ -78,12 +78,12 @@ Each operation has its own tab. The form shows a title, a description, the param
 | Rebalance | `rebalance` | Goals, concurrency, excluded topics, replication throttle, reason, plus the common options below, Kafka assigner mode and destination broker IDs. |
 | Preferred leader election | `rebalance` | Sends `goals=PreferredLeaderElectionGoal`. Moves leadership without moving data. |
 | Rebalance disks | `rebalance` | Sends `rebalance_disk=true`. Moves replicas between the disks of a broker, with no goals. |
+| Remove disks | `remove_disks` | Pick the log dirs to empty (required), plus reason and "Stop the ongoing execution first". |
 | Add broker | `add_broker` | Broker IDs are required. Common options and Kafka assigner mode. |
 | Remove broker | `remove_broker` | Broker IDs are required. Common options, Kafka assigner mode and destination broker IDs. |
 | Demote broker | `demote_broker` | Broker IDs are required. Replication throttle and Disallow capacity estimation. |
 | Fix offline replicas | `fix_offline_replicas` | Common options. |
 | Topic replication factor | `topic_configuration` | Topic (regex) and replication factor are required. Common options, skip rack awareness check, skip hard goal check, concurrency and replication throttle. |
-| Remove disks | `remove_disks` | Pick the log dirs to empty (required), plus reason and "Stop the ongoing execution first". |
 | Self-healing and concurrency | `admin` | Enable or disable self-healing for anomaly types, change concurrency, max partition movements in cluster, intra-broker concurrency and execution progress check interval. |
 | Pause sampling | `pause_sampling` | |
 | Resume sampling | `resume_sampling` | |

@@ -229,6 +229,14 @@ function OperationForm({ op }: { op: Operation }) {
   );
 }
 
+// Consecutive operations with the same group share one titled wrapper; an operation without a group gets its own.
+const groups = OPERATIONS.reduce<Operation[][]>((gs, o) => {
+  const last = gs[gs.length - 1];
+  if (last && o.group && last[0].group === o.group) last.push(o);
+  else gs.push([o]);
+  return gs;
+}, []);
+
 export function Admin() {
   const cluster = useStore(clusterStore);
   const [id, setId] = useState(OPERATIONS[0].id);
@@ -250,20 +258,31 @@ export function Admin() {
         <h1 id="page-title">Admin</h1>
       </div>
       <div class="tabs op-tabs" role="tablist" aria-label="Operations" ref={list}>
-        {OPERATIONS.map((o) => (
-          <button
-            key={o.id}
-            type="button"
-            role="tab"
-            id={`tab-${o.id}`}
-            aria-selected={o.id === id}
-            aria-controls="op-panel"
-            tabIndex={o.id === id ? 0 : -1}
-            onClick={() => setId(o.id)}
-            onKeyDown={onKeyDown}
-          >
-            {o.title}
-          </button>
+        {groups.map((g) => (
+          <div key={g[0].id} class="op-group" role="none">
+            {g[0].group && (
+              <span class="op-group-label" aria-hidden="true">
+                {g[0].group}
+              </span>
+            )}
+            <div class="op-group-tabs" role="none">
+              {g.map((o) => (
+                <button
+                  key={o.id}
+                  type="button"
+                  role="tab"
+                  id={`tab-${o.id}`}
+                  aria-selected={o.id === id}
+                  aria-controls="op-panel"
+                  tabIndex={o.id === id ? 0 : -1}
+                  onClick={() => setId(o.id)}
+                  onKeyDown={onKeyDown}
+                >
+                  {o.title}
+                </button>
+              ))}
+            </div>
+          </div>
         ))}
       </div>
       <div class="panel op-panel" role="tabpanel" id="op-panel" aria-labelledby={`tab-${op.id}`}>

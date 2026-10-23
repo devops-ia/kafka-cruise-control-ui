@@ -241,6 +241,29 @@ describe("Admin", () => {
     expect(sel().textContent).toBe(all[0]);
   });
 
+  it("groups the tabs under hidden titles in one flat tab order", () => {
+    setup();
+    render(<Admin />);
+    const labels = [...document.querySelectorAll(".op-group-label")];
+    expect(labels.map((l) => l.textContent)).toEqual(["Rebalance", "Disks", "Brokers", "Replicas", "Sampling"]);
+    expect(labels.every((l) => l.getAttribute("aria-hidden") === "true")).toBe(true);
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual([
+      "Rebalance",
+      "Preferred leader election",
+      "Rebalance disks",
+      "Remove disks",
+      "Add broker",
+      "Remove broker",
+      "Demote broker",
+      "Fix offline replicas",
+      "Topic replication factor",
+      "Self-healing and concurrency",
+      "Pause sampling",
+      "Resume sampling",
+      "Stop execution",
+    ]);
+  });
+
   it("keeps goals in a collapsed details and says what Simulate and Execute do", () => {
     setup();
     render(<Admin />);

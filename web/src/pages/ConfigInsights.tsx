@@ -30,6 +30,7 @@ export function ConfigInsights() {
           { key: "name", header: "Name", value: (c) => c.name },
           { key: "group", header: "Group", value: (c) => c.group ?? "" },
         ]}
+        pageable
       />
       <h2>Permissions reported by the selected cluster</h2>
       {perms.data ? (
