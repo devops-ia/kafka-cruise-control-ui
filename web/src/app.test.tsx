@@ -110,8 +110,8 @@ describe("App", () => {
     navigate("/summary");
     render(<App />);
     expect((await links()).length).toBe(10);
-    // the build's version sits on its own line after the user; tests build without one
-    expect(document.querySelector(".who + .version")?.textContent).toBe("dev");
+    // the build's version sits under the title; tests build without one
+    expect(document.querySelector(".brand .build")?.textContent).toBe("(build: dev)");
     cleanup();
     asRole("admin", "none");
     render(<App />);

@@ -197,6 +197,12 @@ h2 {
   color: var(--rail-active-text);
   border-bottom: 1px solid var(--rail-active);
 }
+.build {
+  display: block;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--rail-text);
+}
 .mark {
   width: 14px;
   height: 14px;
@@ -237,12 +243,6 @@ h2 {
   padding: var(--s3) var(--s4);
   border-top: 1px solid var(--rail-active);
   overflow-wrap: anywhere;
-}
-.version {
-  padding: var(--s2) var(--s4);
-  border-top: 1px solid var(--rail-active);
-  color: var(--rail-label);
-  font: 11px var(--mono);
 }
 .sidebar .badge {
   background: var(--rail-active);

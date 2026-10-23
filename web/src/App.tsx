@@ -119,7 +119,10 @@ function Shell({ children }: { children: ComponentChildren }) {
       <nav class="sidebar" aria-label="Main">
         <div class="brand">
           <span class="mark" aria-hidden="true" />
-          Cruise Control
+          <div>
+            Cruise Control
+            <small class="build">(build: {import.meta.env.VITE_VERSION || "dev"})</small>
+          </div>
         </div>
         {GROUPS.map((g) => ({ g, routes: ROUTES.filter((r) => r.group === g && (!r.admin || isAdmin(s)) && !(off && r.path === "/review")) }))
           .filter(({ routes }) => routes.length > 0)
@@ -139,9 +142,7 @@ function Shell({ children }: { children: ComponentChildren }) {
           ))}
         <div class="who">
           <span>{s?.user}</span> <span class="badge">{s?.role}</span>
-        </div>
-        <div class="version">{import.meta.env.VITE_VERSION || "dev"}</div>
-      </nav>
+        </div>      </nav>
       <header class="topbar">
         <ClusterSelect />
         <div class="spacer" />
