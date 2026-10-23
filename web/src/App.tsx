@@ -148,7 +148,8 @@ function Shell({ children }: { children: ComponentChildren }) {
           ))}
         <div class="who">
           <span>{s?.user}</span> <span class="badge">{s?.role}</span>
-        </div>      </nav>
+        </div>
+      </nav>
       <header class="topbar">
         <ClusterSelect />
         <div class="spacer" />
