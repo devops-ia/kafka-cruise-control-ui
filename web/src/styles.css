@@ -936,7 +936,26 @@ progress.bar::-moz-progress-bar {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: var(--s5);
-  width: min(520px, calc(100vw - 32px));
+  width: min(720px, calc(100vw - 32px));
+}
+/* The confirm summary holds names and paths, not big figures */
+.dialog .stats {
+  display: flex;
+  flex-wrap: wrap;
+}
+.dialog .stats > div {
+  flex: 1 1 150px;
+}
+.dialog .stats > .wide {
+  flex-basis: 100%;
+}
+.dialog .stats dd {
+  font-size: 14px;
+}
+.dialog .plain {
+  list-style: none;
+  margin: 0;
+  padding: 0;
 }
 .dialog h2 {
   margin-top: 0;

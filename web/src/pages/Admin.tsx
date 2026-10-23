@@ -232,9 +232,17 @@ function OperationForm({ op }: { op: Operation }) {
               <dd>{cluster}</dd>
             </div>
             {values.brokerid_and_logdirs && (
-              <div>
+              <div class="wide">
                 <dt>Log dirs</dt>
-                <dd>{String(values.brokerid_and_logdirs)}</dd>
+                <dd>
+                  <ul class="plain">
+                    {String(values.brokerid_and_logdirs)
+                      .split(",")
+                      .map((d) => (
+                        <li key={d}>{d}</li>
+                      ))}
+                  </ul>
+                </dd>
               </div>
             )}
             {values.brokerid && (

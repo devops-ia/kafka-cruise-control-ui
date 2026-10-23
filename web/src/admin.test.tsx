@@ -98,7 +98,8 @@ describe("Admin", () => {
     pick("Execute");
     const dialog = screen.getByRole("alertdialog").textContent!;
     expect(dialog).toContain("prod-b");
-    expect(dialog).toContain("0-/data/b,1-/data/a");
+    const dirs = within(screen.getByRole("alertdialog")).getAllByRole("listitem").map((li) => li.textContent);
+    expect(dirs).toEqual(["0-/data/b", "1-/data/a"]); // one log dir per line
   });
 
   it("a log dir path with a comma is disabled with a note and never sent", async () => {
