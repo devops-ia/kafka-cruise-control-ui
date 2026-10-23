@@ -51,6 +51,7 @@ CCUI_CLUSTERS__0__AUTH_PASSWORD_FILE=/run/secrets/cc_prod_password
 | `CCUI_TLS_CERT` | none | Path of a PEM certificate. Must be set together with `CCUI_TLS_KEY`. Turns on HTTPS (TLS 1.2 or newer) and the `Strict-Transport-Security` header. |
 | `CCUI_TLS_KEY` | none | Path of the PEM private key. |
 | `CCUI_PUBLIC_URL` | none | The origin users type in the browser, for example `https://cc.example.com`, without a path. A trailing `/` is removed. Required with `oidc`. Also fixes the origin the CSRF check accepts. |
+| `CCUI_LOGO_URL` | none | An `http(s)` URL of an image (SVG, PNG, ICO, ...) shown next to "Cruise Control" in the sidebar and used as the browser favicon. Its origin is added to the CSP `img-src`, and the browser loads it from there on every page. Without it the UI keeps its built-in mark. |
 | `CCUI_MAX_BODY_BYTES` | `1048576` | Largest request body the proxy accepts for Cruise Control. Larger bodies get 413. The SPA sends query parameters only, so the default is plenty. |
 
 ## Sessions and login protection

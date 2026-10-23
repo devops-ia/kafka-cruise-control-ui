@@ -54,6 +54,20 @@ func TestHeadersAlsoOnAPIAndErrors(t *testing.T) {
 	}
 }
 
+func TestLogoURLSetsIconAndImgSrc(t *testing.T) {
+	resp, body := get(t, newServer(t, testConfig(t)).URL+"/")
+	if !strings.Contains(body, `href="/logo.svg"`) || !strings.Contains(resp.Header.Get("Content-Security-Policy"), "img-src 'self' data:;") {
+		t.Fatalf("default icon or img-src changed: %s\n%s", resp.Header.Get("Content-Security-Policy"), body)
+	}
+	resp, body = get(t, newServer(t, testConfig(t, "CCUI_LOGO_URL", "https://cdn.example.com/brand/logo.png?v=1&s=2")).URL+"/")
+	if !strings.Contains(body, `<link rel="icon" href="https://cdn.example.com/brand/logo.png?v=1&amp;s=2" />`) {
+		t.Errorf("icon link not replaced: %s", body)
+	}
+	if !strings.Contains(resp.Header.Get("Content-Security-Policy"), "img-src 'self' data: https://cdn.example.com;") {
+		t.Errorf("img-src lacks the logo origin: %s", resp.Header.Get("Content-Security-Policy"))
+	}
+}
+
 func TestHSTSOnlyWithTLS(t *testing.T) {
 	s := newServer(t, testConfig(t, "CCUI_TLS_CERT", "/c.pem", "CCUI_TLS_KEY", "/k.pem"))
 	resp, _ := get(t, s.URL+"/")

@@ -15,8 +15,11 @@ func nonceFrom(ctx context.Context) string {
 }
 
 // secureHeaders adds the browser defences to every response and a fresh CSP nonce per request.
-// HSTS is sent only when this process terminates TLS itself.
-func secureHeaders(tls bool, next http.Handler) http.Handler {
+// HSTS is sent only when this process terminates TLS itself. imgSrc adds one origin to img-src, for CCUI_LOGO_URL.
+func secureHeaders(tls bool, imgSrc string, next http.Handler) http.Handler {
+	if imgSrc != "" {
+		imgSrc = " " + imgSrc
+	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		b := make([]byte, 16)
 		if _, err := rand.Read(b); err != nil {
@@ -24,7 +27,7 @@ func secureHeaders(tls bool, next http.Handler) http.Handler {
 		}
 		nonce := base64.RawURLEncoding.EncodeToString(b)
 		h := w.Header()
-		h.Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'nonce-"+nonce+"'; style-src 'self'; img-src 'self' data:; "+
+		h.Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'nonce-"+nonce+"'; style-src 'self'; img-src 'self' data:"+imgSrc+"; "+
 			"connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'")
 		h.Set("X-Frame-Options", "DENY")
 		h.Set("X-Content-Type-Options", "nosniff")

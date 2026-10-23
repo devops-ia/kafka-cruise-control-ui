@@ -45,6 +45,7 @@ Secrets (passwords, tokens, client secrets, the session secret) have no default.
 | `CCUI_TLS_CERT` | no | none | `/tls/tls.crt` (set together with `CCUI_TLS_KEY`) |
 | `CCUI_TLS_KEY` | no | none | `/tls/tls.key` |
 | `CCUI_PUBLIC_URL` | with `oidc` | none | `https://cc.example.com`, the origin users type in the browser |
+| `CCUI_LOGO_URL` | no | built-in mark | `https://cdn.example.com/logo.svg`, the sidebar icon and favicon |
 | `CCUI_SESSION_SECRET` | with `local` and `oidc` | none | 32 or more random characters, see `_FILE` below |
 | `CCUI_SESSION_IDLE_TIMEOUT` | no | `30m` | `15m` |
 | `CCUI_SESSION_MAX_AGE` | no | `12h` | `8h` |

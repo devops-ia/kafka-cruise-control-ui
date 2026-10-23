@@ -14,7 +14,7 @@ import (
 )
 
 var testWeb = fstest.MapFS{
-	"index.html":    {Data: []byte(`<!doctype html><html><head><script type="module" src="/assets/app.js"></script></head><body></body></html>`)},
+	"index.html":    {Data: []byte(`<!doctype html><html><head><link rel="icon" href="/logo.svg" /><script type="module" src="/assets/app.js"></script></head><body></body></html>`)},
 	"assets/app.js": {Data: []byte(`console.log(1)`)},
 }
 

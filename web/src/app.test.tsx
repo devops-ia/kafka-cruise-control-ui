@@ -112,6 +112,15 @@ describe("App", () => {
     expect((await links()).length).toBe(10);
     // the build's version sits under the title; tests build without one
     expect(document.querySelector(".brand .build")?.textContent).toBe("(build: dev)");
+    expect(document.querySelector(".brand img")).toBeNull(); // no CCUI_LOGO_URL: the built-in mark
+    cleanup();
+    const icon = Object.assign(document.createElement("link"), { rel: "icon" });
+    icon.setAttribute("href", "https://cdn.example.com/logo.png");
+    document.head.append(icon);
+    render(<App />);
+    await links();
+    expect(document.querySelector(".brand img")?.getAttribute("src")).toBe("https://cdn.example.com/logo.png");
+    icon.remove();
     cleanup();
     asRole("admin", "none");
     render(<App />);

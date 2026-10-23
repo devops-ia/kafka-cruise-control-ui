@@ -209,6 +209,12 @@ h2 {
   background: var(--accent);
   border-radius: var(--radius);
 }
+.mark.logo {
+  width: 20px;
+  height: 20px;
+  background: none;
+  object-fit: contain;
+}
 .sidebar h2 {
   font-size: 10.5px;
   font-weight: 600;
