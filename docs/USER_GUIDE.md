@@ -69,7 +69,7 @@ Asks Cruise Control for the proposal it would make with its default goals, and s
 
 ## Admin
 
-Each operation has its own tab. The tabs sit in groups, in this order: Rebalance, Disks, Brokers, Replicas, then Self-healing and concurrency on its own, Sampling, and Stop execution on its own at the right end. The form shows a title, a description, the parameters (required ones are marked `*`) and an actions bar. Leave a field empty to leave the parameter out. Use the left and right arrow keys, Home and End to move between tabs; the arrows go through every tab in the order above, across the groups.
+The operations are listed on the left of the page, and the form of the chosen one is on the right. The list has these groups, in order: Rebalance, Disks, Brokers, Replicas, then Self-healing and concurrency on its own, Sampling and Executions. On narrow screens the list sits above the form. The form shows a title, a description, the parameters (required ones are marked `*`) and an actions bar. Leave a field empty to leave the parameter out. Use the up and down arrow keys (left and right work too), Home and End to move through the list; the arrows go through every operation in the order above, across the groups.
 
 ![Admin](assets/screenshots/admin.png)
 

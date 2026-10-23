@@ -180,6 +180,7 @@ export const OPERATIONS: Operation[] = [
   { id: "resume_sampling", group: "Sampling", title: "Resume sampling", endpoint: "resume_sampling", description: "Start collecting load metrics again.", dryRunnable: false, confirm: false, fields: [{ name: "reason", label: "Reason", kind: "text" }] },
   {
     id: "stop_execution",
+    group: "Executions",
     title: "Stop execution",
     endpoint: "stop_proposal_execution",
     description: "Stop the proposal that is executing now.",

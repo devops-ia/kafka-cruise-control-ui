@@ -243,10 +243,12 @@ export function Admin() {
   const list = useRef<HTMLDivElement>(null);
   const idx = OPERATIONS.findIndex((o) => o.id === id);
   const op = OPERATIONS[idx];
-  // WAI-ARIA tabs: arrows wrap, Home/End jump; focus follows selection.
+  // WAI-ARIA vertical tabs: Up/Down (and Left/Right) wrap, Home/End jump; focus follows selection.
   const onKeyDown = (e: KeyboardEvent) => {
     const n = OPERATIONS.length;
-    const to = { ArrowRight: (idx + 1) % n, ArrowLeft: (idx + n - 1) % n, Home: 0, End: n - 1 }[e.key];
+    const next = (idx + 1) % n;
+    const prev = (idx + n - 1) % n;
+    const to = { ArrowDown: next, ArrowRight: next, ArrowUp: prev, ArrowLeft: prev, Home: 0, End: n - 1 }[e.key];
     if (to === undefined) return;
     e.preventDefault();
     setId(OPERATIONS[to].id);
@@ -257,15 +259,15 @@ export function Admin() {
       <div class="page-head">
         <h1 id="page-title">Admin</h1>
       </div>
-      <div class="tabs op-tabs" role="tablist" aria-label="Operations" ref={list}>
-        {groups.map((g) => (
-          <div key={g[0].id} class="op-group" role="none">
-            {g[0].group && (
-              <span class="op-group-label" aria-hidden="true">
-                {g[0].group}
-              </span>
-            )}
-            <div class="op-group-tabs" role="none">
+      <div class="op-layout">
+        <div class="op-nav" role="tablist" aria-label="Operations" aria-orientation="vertical" ref={list}>
+          {groups.map((g) => (
+            <div key={g[0].id} class="op-group" role="none">
+              {g[0].group && (
+                <span class="op-group-label" aria-hidden="true">
+                  {g[0].group}
+                </span>
+              )}
               {g.map((o) => (
                 <button
                   key={o.id}
@@ -282,11 +284,11 @@ export function Admin() {
                 </button>
               ))}
             </div>
-          </div>
-        ))}
-      </div>
-      <div class="panel op-panel" role="tabpanel" id="op-panel" aria-labelledby={`tab-${op.id}`}>
-        <OperationForm key={`${cluster}:${op.id}`} op={op} />
+          ))}
+        </div>
+        <div class="panel op-panel" role="tabpanel" id="op-panel" aria-labelledby={`tab-${op.id}`}>
+          <OperationForm key={`${cluster}:${op.id}`} op={op} />
+        </div>
       </div>
     </section>
   );

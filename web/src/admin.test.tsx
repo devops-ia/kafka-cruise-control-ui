@@ -204,11 +204,12 @@ describe("Admin", () => {
     expect(posts(calls)[0].query.get("data_from")).toBe("valid_partitions");
   });
 
-  it("is a horizontal tab bar wired to one labelled tabpanel", () => {
+  it("is a vertical tab list wired to one labelled tabpanel", () => {
     setup();
     render(<Admin />);
     const list = screen.getByRole("tablist");
     expect(list.getAttribute("aria-label")).toBeTruthy();
+    expect(list.getAttribute("aria-orientation")).toBe("vertical");
     const tabs = screen.getAllByRole("tab");
     expect(tabs.filter((t) => t.getAttribute("aria-selected") === "true")).toHaveLength(1);
     expect(tabs.map((t) => t.tabIndex)).toEqual(tabs.map((_, i) => (i === 0 ? 0 : -1))); // roving tabindex
@@ -218,6 +219,19 @@ describe("Admin", () => {
     expect(panel.textContent).toContain("Move replicas and leaders");
     tab("Remove broker");
     expect(screen.getByRole("tabpanel").getAttribute("aria-labelledby")).toBe(screen.getByRole("tab", { name: "Remove broker" }).id);
+  });
+
+  it("moves between tabs with ArrowUp and ArrowDown, wrapping at the ends", () => {
+    setup();
+    render(<Admin />);
+    const all = screen.getAllByRole("tab").map((t) => t.textContent);
+    const sel = () => screen.getByRole("tab", { selected: true });
+    fireEvent.keyDown(sel(), { key: "ArrowDown" });
+    expect(sel().textContent).toBe(all[1]);
+    fireEvent.keyDown(sel(), { key: "ArrowUp" });
+    fireEvent.keyDown(sel(), { key: "ArrowUp" });
+    expect(sel().textContent).toBe(all[all.length - 1]);
+    expect(document.activeElement).toBe(sel());
   });
 
   it("moves between tabs with ArrowLeft, ArrowRight, Home and End, wrapping at the ends", () => {
@@ -245,7 +259,7 @@ describe("Admin", () => {
     setup();
     render(<Admin />);
     const labels = [...document.querySelectorAll(".op-group-label")];
-    expect(labels.map((l) => l.textContent)).toEqual(["Rebalance", "Disks", "Brokers", "Replicas", "Sampling"]);
+    expect(labels.map((l) => l.textContent)).toEqual(["Rebalance", "Disks", "Brokers", "Replicas", "Sampling", "Executions"]);
     expect(labels.every((l) => l.getAttribute("aria-hidden") === "true")).toBe(true);
     expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual([
       "Rebalance",
