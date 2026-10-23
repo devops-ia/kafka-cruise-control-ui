@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/preact";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/preact";
 import { useState } from "preact/hooks";
 import { ResultDialog } from "./components/Dialog";
 import { TaskPanel } from "./components/TaskPanel";
@@ -202,6 +202,38 @@ describe("result dialog", () => {
     fireEvent.click(within(dlg).getByRole("button", { name: "Dismiss" }));
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(tasks.get()).toHaveLength(0);
+  });
+
+  it("a real run that finished OK closes after 5 s; dry runs, errors and an open result stay", () => {
+    vi.useFakeTimers();
+    try {
+      const real = { ...done, id: 2, endpoint: "resume_sampling", dryrun: undefined };
+      tasks.set([real, done, { ...done, id: 3, endpoint: "remove_broker", dryrun: "false", state: "error", error: "boom", result: undefined }]);
+      render(<TaskPanel />);
+      act(() => {
+        vi.advanceTimersByTime(4999);
+      });
+      expect(tasks.get().map((t) => t.id)).toEqual([2, 1, 3]);
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
+      expect(tasks.get().map((t) => t.id)).toEqual([1, 3]);
+      cleanup();
+      tasks.set([real]);
+      render(<TaskPanel />);
+      fireEvent.click(screen.getByRole("button", { name: "Show result" }));
+      act(() => {
+        vi.advanceTimersByTime(10000);
+      });
+      expect(tasks.get()).toHaveLength(1); // not under its open result
+      fireEvent.click(screen.getByRole("button", { name: "Close" }));
+      act(() => {
+        vi.advanceTimersByTime(5000);
+      });
+      expect(tasks.get()).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("a running task has neither Show result nor Dismiss; an error task keeps Dismiss", () => {

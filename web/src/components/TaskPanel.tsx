@@ -14,6 +14,25 @@ export function TaskPanel() {
     if (refocus.current) heading.current?.focus();
     refocus.current = false;
   });
+  // A real run that finished OK closes itself; simulations, errors and reviews stay until Dismiss, and nothing closes under its open result.
+  const timers = useRef(new Map<number, ReturnType<typeof setTimeout>>());
+  useEffect(() => {
+    for (const t of tasks) {
+      const auto = t.state === "done" && t.dryrun !== "true" && t.id !== open;
+      if (auto && !timers.current.has(t.id)) {
+        const close = () => {
+          timers.current.delete(t.id);
+          dismissTask(t.id);
+        };
+        timers.current.set(t.id, setTimeout(close, 5000));
+      }
+      if (!auto && timers.current.has(t.id)) {
+        clearTimeout(timers.current.get(t.id));
+        timers.current.delete(t.id);
+      }
+    }
+  }, [tasks, open]);
+  useEffect(() => () => timers.current.forEach(clearTimeout), []);
   if (tasks.length === 0) return null;
   return (
     <aside class="task-panel" aria-label="Operations">
