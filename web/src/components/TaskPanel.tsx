@@ -14,28 +14,34 @@ export function TaskPanel() {
     if (refocus.current) heading.current?.focus();
     refocus.current = false;
   });
-  // A real run that finished OK closes itself; simulations, errors and reviews stay until Dismiss, and nothing closes under its open result.
+  // A finished run (dry run or not) closes itself after 5 s; errors and reviews stay until Dismiss. The pointer on the
+  // panel pauses every timer, focus inside it puts the close off by another 5 s, and nothing closes under its open result.
+  const [hover, setHover] = useState(false);
+  const panel = useRef<HTMLElement>(null);
   const timers = useRef(new Map<number, ReturnType<typeof setTimeout>>());
+  const schedule = (id: number) =>
+    timers.current.set(
+      id,
+      setTimeout(() => {
+        if (panel.current?.contains(document.activeElement)) return schedule(id);
+        timers.current.delete(id);
+        dismissTask(id);
+      }, 5000),
+    );
   useEffect(() => {
     for (const t of tasks) {
-      const auto = t.state === "done" && t.dryrun !== "true" && t.id !== open;
-      if (auto && !timers.current.has(t.id)) {
-        const close = () => {
-          timers.current.delete(t.id);
-          dismissTask(t.id);
-        };
-        timers.current.set(t.id, setTimeout(close, 5000));
-      }
+      const auto = t.state === "done" && t.id !== open && !hover;
+      if (auto && !timers.current.has(t.id)) schedule(t.id);
       if (!auto && timers.current.has(t.id)) {
         clearTimeout(timers.current.get(t.id));
         timers.current.delete(t.id);
       }
     }
-  }, [tasks, open]);
+  }, [tasks, open, hover]);
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
   if (tasks.length === 0) return null;
   return (
-    <aside class="task-panel" aria-label="Operations">
+    <aside ref={panel} class="task-panel" aria-label="Operations" onPointerEnter={() => setHover(true)} onPointerLeave={() => setHover(false)}>
       <h2 ref={heading} tabIndex={-1}>
         Operations
       </h2>

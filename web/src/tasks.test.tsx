@@ -204,32 +204,40 @@ describe("result dialog", () => {
     expect(tasks.get()).toHaveLength(0);
   });
 
-  it("a real run that finished OK closes after 5 s; dry runs, errors and an open result stay", () => {
+  it("finished runs, dry runs too, close after 5 s; errors stay, and hover, focus or an open result pause it", () => {
     vi.useFakeTimers();
+    const wait = (ms: number) =>
+      act(() => {
+        vi.advanceTimersByTime(ms);
+      });
     try {
       const real = { ...done, id: 2, endpoint: "resume_sampling", dryrun: undefined };
       tasks.set([real, done, { ...done, id: 3, endpoint: "remove_broker", dryrun: "false", state: "error", error: "boom", result: undefined }]);
       render(<TaskPanel />);
-      act(() => {
-        vi.advanceTimersByTime(4999);
-      });
+      wait(4999);
       expect(tasks.get().map((t) => t.id)).toEqual([2, 1, 3]);
-      act(() => {
-        vi.advanceTimersByTime(1);
-      });
-      expect(tasks.get().map((t) => t.id)).toEqual([1, 3]);
+      wait(1);
+      expect(tasks.get().map((t) => t.id)).toEqual([3]);
       cleanup();
-      tasks.set([real]);
+
+      tasks.set([done]);
       render(<TaskPanel />);
+      const panel = screen.getByRole("complementary", { name: "Operations" });
+      fireEvent.pointerEnter(panel);
+      wait(10000);
+      expect(tasks.get()).toHaveLength(1); // paused under the pointer
+      fireEvent.pointerLeave(panel);
+      wait(4999);
+      expect(tasks.get()).toHaveLength(1); // a full 5 s again after leaving
       fireEvent.click(screen.getByRole("button", { name: "Show result" }));
-      act(() => {
-        vi.advanceTimersByTime(10000);
-      });
+      wait(10000);
       expect(tasks.get()).toHaveLength(1); // not under its open result
       fireEvent.click(screen.getByRole("button", { name: "Close" }));
-      act(() => {
-        vi.advanceTimersByTime(5000);
-      });
+      screen.getByRole("button", { name: "Dismiss" }).focus();
+      wait(10000);
+      expect(tasks.get()).toHaveLength(1); // keyboard focus inside the panel puts it off
+      (document.activeElement as HTMLElement).blur();
+      wait(5000);
       expect(tasks.get()).toHaveLength(0);
     } finally {
       vi.useRealTimers();
