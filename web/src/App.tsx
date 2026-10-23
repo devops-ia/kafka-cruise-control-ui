@@ -106,6 +106,12 @@ function Forbidden({ title }: { title: string }) {
   );
 }
 
+/** CCUI_LOGO_URL as the server wrote it into the icon link; undefined keeps the built-in mark. */
+const logo = () => {
+  const href = document.querySelector('link[rel="icon"]')?.getAttribute("href");
+  return href && href !== "/logo.svg" ? href : undefined;
+};
+
 function Shell({ children }: { children: ComponentChildren }) {
   const s = useSession();
   const current = useStore(path);
@@ -118,8 +124,11 @@ function Shell({ children }: { children: ComponentChildren }) {
       </a>
       <nav class="sidebar" aria-label="Main">
         <div class="brand">
-          <span class="mark" aria-hidden="true" />
-          Cruise Control
+          {logo() ? <img class="mark logo" src={logo()} alt="" /> : <span class="mark" aria-hidden="true" />}
+          <div>
+            Cruise Control
+            <small class="build">{import.meta.env.VITE_VERSION || "dev"}</small>
+          </div>
         </div>
         {GROUPS.map((g) => ({ g, routes: ROUTES.filter((r) => r.group === g && (!r.admin || isAdmin(s)) && !(off && r.path === "/review")) }))
           .filter(({ routes }) => routes.length > 0)

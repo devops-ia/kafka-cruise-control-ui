@@ -18,6 +18,7 @@ jobs:
       dockerhub_repo: kafka-cruise-control-ui
       image_title: Kafka Cruise Control UI
       image_description: Web UI and authenticated proxy for one or more Kafka Cruise Control clusters
+      build_args: VERSION=${{ github.event.release.tag_name || github.ref_name }}
     secrets:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
       DOCKERHUB_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}

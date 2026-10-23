@@ -45,6 +45,7 @@ Secrets (passwords, tokens, client secrets, the session secret) have no default.
 | `CCUI_TLS_CERT` | no | none | `/tls/tls.crt` (set together with `CCUI_TLS_KEY`) |
 | `CCUI_TLS_KEY` | no | none | `/tls/tls.key` |
 | `CCUI_PUBLIC_URL` | with `oidc` | none | `https://cc.example.com`, the origin users type in the browser |
+| `CCUI_LOGO_URL` | no | built-in mark | `https://cdn.example.com/logo.svg`, the sidebar icon and favicon |
 | `CCUI_SESSION_SECRET` | with `local` and `oidc` | none | 32 or more random characters, see `_FILE` below |
 | `CCUI_SESSION_IDLE_TIMEOUT` | no | `30m` | `15m` |
 | `CCUI_SESSION_MAX_AGE` | no | `12h` | `8h` |
@@ -201,7 +202,7 @@ CCUI_AUTH_MODE=none CCUI_CLUSTERS__0__NAME=local CCUI_CLUSTERS__0__URL=http://lo
 
 For SPA work, `cd web && npm run dev` starts Vite on port 5173 and proxies `/api` to a server on port 8080. `npm run typecheck` and `npm test` run the type checks and the unit tests.
 
-`docker build -t kafka-cruise-control-ui .` runs the same three stages as CI: Node builds the SPA, Go builds the binary with the SPA embedded, and the result is copied into a distroless non-root image.
+`docker build -t kafka-cruise-control-ui .` runs the same three stages as CI: Node builds the SPA, Go builds the binary with the SPA embedded, and the result is copied into a distroless non-root image. The sidebar shows `dev` as the version unless you pass one, for example `--build-arg VERSION=v1.4.0`; CI passes the release tag.
 
 The frozen LinkedIn UI can still be built locally with `docker build --target legacy`; see [Legacy UI](docs/DEPLOYMENT.md#legacy-ui).
 

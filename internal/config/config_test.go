@@ -109,6 +109,9 @@ func TestInvalid(t *testing.T) {
 		{"plaintext password", base("CCUI_AUTH_MODE", "local", "CCUI_SESSION_SECRET", strings.Repeat("s", 32), "CCUI_LOCAL_ADMIN_PASSWORD_HASH", "hunter2"), "CCUI_LOCAL_ADMIN_PASSWORD_HASH"},
 		{"local needs secret", base("CCUI_AUTH_MODE", "local", "CCUI_LOCAL_ADMIN_PASSWORD_HASH", hash), "CCUI_SESSION_SECRET"},
 		{"tls half", base("CCUI_TLS_CERT", "/c.pem"), "CCUI_TLS_KEY"},
+		{"logo not http", base("CCUI_LOGO_URL", "javascript:alert(1)"), "CCUI_LOGO_URL"},
+		{"logo relative", base("CCUI_LOGO_URL", "/logo.png"), "CCUI_LOGO_URL"},
+		{"logo host breaks csp", base("CCUI_LOGO_URL", "https://a;script-src"), "CCUI_LOGO_URL"}, // parses: only the host guard rejects it
 		{"unknown var", base("CCUI_CLUSTERS__0__AUTH_TPYE", "basic"), "CCUI_CLUSTERS__0__AUTH_TPYE"},
 		{"oidc mode needs provider", base("CCUI_AUTH_MODE", "oidc", "CCUI_SESSION_SECRET", strings.Repeat("s", 32), "CCUI_PUBLIC_URL", "https://ui"), "CCUI_OIDC__0__"},
 	}

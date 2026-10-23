@@ -25,6 +25,8 @@ export interface Operation {
   fixed?: Params;
   /** Sends verbose=true so the result carries the proposals and the load before and after. */
   verbose?: boolean;
+  /** Admin tab group title; consecutive operations with the same group share one title. */
+  group?: string;
   fields: Field[];
 }
 
@@ -55,9 +57,10 @@ const destinations: Field = { name: "destination_broker_ids", label: "Destinatio
 const brokers = (help: string): Field => ({ name: "brokerid", label: "Broker IDs", kind: "text", required: true, help });
 
 export const OPERATIONS: Operation[] = [
-  { id: "rebalance", title: "Rebalance", endpoint: "rebalance", description: "Move replicas and leaders to balance the cluster.", dryRunnable: true, confirm: true, verbose: true, fields: [goals, ...tuning, capacity, readyGoals, dataFrom, assigner, destinations] },
+  { id: "rebalance", group: "Rebalance", title: "Rebalance", endpoint: "rebalance", description: "Move replicas and leaders to balance the cluster.", dryRunnable: true, confirm: true, verbose: true, fields: [goals, ...tuning, capacity, readyGoals, dataFrom, assigner, destinations] },
   {
     id: "leader_election",
+    group: "Rebalance",
     title: "Preferred leader election",
     endpoint: "rebalance",
     description: "Move leadership back to the preferred replicas without moving data.",
@@ -69,6 +72,7 @@ export const OPERATIONS: Operation[] = [
   },
   {
     id: "rebalance_disk",
+    group: "Disks",
     title: "Rebalance disks",
     endpoint: "rebalance",
     description: "Move replicas between the disks of each broker, not between brokers.",
@@ -79,7 +83,18 @@ export const OPERATIONS: Operation[] = [
     fields: [tuning[6]],
   },
   {
+    id: "remove_disks",
+    group: "Disks",
+    title: "Remove disks",
+    endpoint: "remove_disks",
+    description: "Move replicas off the chosen log dirs so the disks can be removed.",
+    dryRunnable: true,
+    confirm: true,
+    fields: [{ name: "brokerid_and_logdirs", label: "Log dirs to empty", kind: "logdirs", required: true }, tuning[5], tuning[6]],
+  },
+  {
     id: "add_broker",
+    group: "Brokers",
     title: "Add broker",
     endpoint: "add_broker",
     description: "Move load onto newly added brokers.",
@@ -90,6 +105,7 @@ export const OPERATIONS: Operation[] = [
   },
   {
     id: "remove_broker",
+    group: "Brokers",
     title: "Remove broker",
     endpoint: "remove_broker",
     description: "Move everything off the brokers so they can be shut down.",
@@ -100,6 +116,7 @@ export const OPERATIONS: Operation[] = [
   },
   {
     id: "demote_broker",
+    group: "Brokers",
     title: "Demote broker",
     endpoint: "demote_broker",
     description: "Move leadership away from the brokers.",
@@ -116,9 +133,10 @@ export const OPERATIONS: Operation[] = [
       tuning[6],
     ],
   },
-  { id: "fix_offline_replicas", title: "Fix offline replicas", endpoint: "fix_offline_replicas", description: "Move replicas off dead disks and brokers.", dryRunnable: true, confirm: true, verbose: true, fields: [goals, ...tuning, capacity, readyGoals, dataFrom] },
+  { id: "fix_offline_replicas", group: "Replicas", title: "Fix offline replicas", endpoint: "fix_offline_replicas", description: "Move replicas off dead disks and brokers.", dryRunnable: true, confirm: true, verbose: true, fields: [goals, ...tuning, capacity, readyGoals, dataFrom] },
   {
     id: "topic_configuration",
+    group: "Replicas",
     title: "Topic replication factor",
     endpoint: "topic_configuration",
     description: "Change the replication factor of topics.",
@@ -141,15 +159,6 @@ export const OPERATIONS: Operation[] = [
     ],
   },
   {
-    id: "remove_disks",
-    title: "Remove disks",
-    endpoint: "remove_disks",
-    description: "Move replicas off the chosen log dirs so the disks can be removed.",
-    dryRunnable: true,
-    confirm: true,
-    fields: [{ name: "brokerid_and_logdirs", label: "Log dirs to empty", kind: "logdirs", required: true }, tuning[5], tuning[6]],
-  },
-  {
     id: "admin",
     title: "Self-healing and concurrency",
     endpoint: "admin",
@@ -167,10 +176,11 @@ export const OPERATIONS: Operation[] = [
       { name: "reason", label: "Reason", kind: "text" },
     ],
   },
-  { id: "pause_sampling", title: "Pause sampling", endpoint: "pause_sampling", description: "Stop collecting load metrics.", dryRunnable: false, confirm: false, fields: [{ name: "reason", label: "Reason", kind: "text" }] },
-  { id: "resume_sampling", title: "Resume sampling", endpoint: "resume_sampling", description: "Start collecting load metrics again.", dryRunnable: false, confirm: false, fields: [{ name: "reason", label: "Reason", kind: "text" }] },
+  { id: "pause_sampling", group: "Sampling", title: "Pause sampling", endpoint: "pause_sampling", description: "Stop collecting load metrics.", dryRunnable: false, confirm: false, fields: [{ name: "reason", label: "Reason", kind: "text" }] },
+  { id: "resume_sampling", group: "Sampling", title: "Resume sampling", endpoint: "resume_sampling", description: "Start collecting load metrics again.", dryRunnable: false, confirm: false, fields: [{ name: "reason", label: "Reason", kind: "text" }] },
   {
     id: "stop_execution",
+    group: "Executions",
     title: "Stop execution",
     endpoint: "stop_proposal_execution",
     description: "Stop the proposal that is executing now.",

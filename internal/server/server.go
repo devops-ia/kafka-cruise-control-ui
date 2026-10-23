@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/devops-ia/kafka-cruise-control-ui/internal/auth"
@@ -55,9 +56,13 @@ func New(d Deps) (http.Handler, error) {
 	am := auth.NewManager(cfg, d.Log)
 	am.Routes(mux)
 	mux.Handle("/api/", am.Protect(api))
-	mux.Handle("/", spa(d.Web))
+	mux.Handle("/", spa(d.Web, cfg.LogoURL))
 
-	return secureHeaders(cfg.TLSEnabled(), rejectDotDot(mux)), nil
+	logoOrigin := ""
+	if u, err := url.Parse(cfg.LogoURL); err == nil && u.Host != "" {
+		logoOrigin = u.Scheme + "://" + u.Host
+	}
+	return secureHeaders(cfg.TLSEnabled(), logoOrigin, rejectDotDot(mux)), nil
 }
 
 func ok(w http.ResponseWriter, _ *http.Request) {

@@ -26,6 +26,7 @@ export function MovementTable({ title, movements }: { title: string; movements: 
     <Table
       caption={`${title} (${rows.length})`}
       rows={rows}
+      pageable
       columns={[
         { key: "topic", header: "Topic", value: (r) => r.topic },
         { key: "partition", header: "Partition", value: (r) => r.partition ?? "", numeric: true },

@@ -1,5 +1,6 @@
 import { useRef, useState } from "preact/hooks";
 import { ConfirmDialog } from "../components/Dialog";
+import { Table } from "../components/Table";
 import { useGoals } from "../goals";
 import { useResource } from "../hooks";
 import { buildParams, OPERATIONS, type Field, type Operation, type Values } from "../ops";
@@ -49,19 +50,39 @@ function LogDirPicker({ value, onChange }: { value: string; onChange: (v: string
   const dirs: Record<string, string[]> = res.data.KafkaBrokerState?.OnlineLogDirsByBrokerId ?? {};
   const ids = Object.keys(dirs).sort((a, b) => Number(a) - Number(b));
   if (ids.length === 0) return <p class="muted">This cluster does not report any log dirs, so there is nothing to choose. Cruise Control needs a Kafka version that returns them.</p>;
+  // One row per log dir in the shared table, so it filters, pages and grows down; the selection lives in value and survives both.
+  const rows = ids.flatMap((id) => dirs[id].map((d) => ({ id, d, key: `${id}-${d}` })));
   return (
-    <div class="goal-groups">
-      {ids.map((id) => (
-        <fieldset key={id}>
-          <legend>Broker {id}</legend>
-          {dirs[id].map((d) => (
-            <label key={d} class="check">
-              <input type="checkbox" checked={chosen.has(`${id}-${d}`)} disabled={d.includes(",")} onChange={() => toggle(`${id}-${d}`)} /> {d}
-              {d.includes(",") && <small class="muted"> (path contains a comma, cannot be selected)</small>}
-            </label>
-          ))}
-        </fieldset>
-      ))}
+    <div class="stack logdirs">
+      <p class="muted" aria-live="polite">
+        {chosen.size} of {rows.length} log dirs selected
+      </p>
+      <Table
+        caption="Log dirs"
+        rows={rows}
+        rowKey={(r) => r.key}
+        pageable
+        columns={[
+          {
+            key: "pick",
+            header: "Remove",
+            value: (r) => (chosen.has(r.key) ? 1 : 0),
+            render: (r) => <input type="checkbox" aria-label={`Broker ${r.id} ${r.d}`} checked={chosen.has(r.key)} disabled={r.d.includes(",")} onChange={() => toggle(r.key)} />,
+          },
+          { key: "broker", header: "Broker", value: (r) => Number(r.id), numeric: true },
+          {
+            key: "dir",
+            header: "Log dir",
+            value: (r) => r.d,
+            render: (r) => (
+              <span class="logdir">
+                {r.d}
+                {r.d.includes(",") && <small class="muted"> (path contains a comma, cannot be selected)</small>}
+              </span>
+            ),
+          },
+        ]}
+      />
     </div>
   );
 }
@@ -211,9 +232,17 @@ function OperationForm({ op }: { op: Operation }) {
               <dd>{cluster}</dd>
             </div>
             {values.brokerid_and_logdirs && (
-              <div>
+              <div class="wide">
                 <dt>Log dirs</dt>
-                <dd>{String(values.brokerid_and_logdirs)}</dd>
+                <dd>
+                  <ul class="plain">
+                    {String(values.brokerid_and_logdirs)
+                      .split(",")
+                      .map((d) => (
+                        <li key={d}>{d}</li>
+                      ))}
+                  </ul>
+                </dd>
               </div>
             )}
             {values.brokerid && (
@@ -229,16 +258,26 @@ function OperationForm({ op }: { op: Operation }) {
   );
 }
 
+// Consecutive operations with the same group share one titled wrapper; an operation without a group gets its own.
+const groups = OPERATIONS.reduce<Operation[][]>((gs, o) => {
+  const last = gs[gs.length - 1];
+  if (last && o.group && last[0].group === o.group) last.push(o);
+  else gs.push([o]);
+  return gs;
+}, []);
+
 export function Admin() {
   const cluster = useStore(clusterStore);
   const [id, setId] = useState(OPERATIONS[0].id);
   const list = useRef<HTMLDivElement>(null);
   const idx = OPERATIONS.findIndex((o) => o.id === id);
   const op = OPERATIONS[idx];
-  // WAI-ARIA tabs: arrows wrap, Home/End jump; focus follows selection.
+  // WAI-ARIA vertical tabs: Up/Down (and Left/Right) wrap, Home/End jump; focus follows selection.
   const onKeyDown = (e: KeyboardEvent) => {
     const n = OPERATIONS.length;
-    const to = { ArrowRight: (idx + 1) % n, ArrowLeft: (idx + n - 1) % n, Home: 0, End: n - 1 }[e.key];
+    const next = (idx + 1) % n;
+    const prev = (idx + n - 1) % n;
+    const to = { ArrowDown: next, ArrowRight: next, ArrowUp: prev, ArrowLeft: prev, Home: 0, End: n - 1 }[e.key];
     if (to === undefined) return;
     e.preventDefault();
     setId(OPERATIONS[to].id);
@@ -249,25 +288,36 @@ export function Admin() {
       <div class="page-head">
         <h1 id="page-title">Admin</h1>
       </div>
-      <div class="tabs op-tabs" role="tablist" aria-label="Operations" ref={list}>
-        {OPERATIONS.map((o) => (
-          <button
-            key={o.id}
-            type="button"
-            role="tab"
-            id={`tab-${o.id}`}
-            aria-selected={o.id === id}
-            aria-controls="op-panel"
-            tabIndex={o.id === id ? 0 : -1}
-            onClick={() => setId(o.id)}
-            onKeyDown={onKeyDown}
-          >
-            {o.title}
-          </button>
-        ))}
-      </div>
-      <div class="panel op-panel" role="tabpanel" id="op-panel" aria-labelledby={`tab-${op.id}`}>
-        <OperationForm key={`${cluster}:${op.id}`} op={op} />
+      <div class="op-layout">
+        <div class="op-nav" role="tablist" aria-label="Operations" aria-orientation="vertical" ref={list}>
+          {groups.map((g) => (
+            <div key={g[0].id} class="op-group" role="none">
+              {g[0].group && (
+                <span class="op-group-label" aria-hidden="true">
+                  {g[0].group}
+                </span>
+              )}
+              {g.map((o) => (
+                <button
+                  key={o.id}
+                  type="button"
+                  role="tab"
+                  id={`tab-${o.id}`}
+                  aria-selected={o.id === id}
+                  aria-controls="op-panel"
+                  tabIndex={o.id === id ? 0 : -1}
+                  onClick={() => setId(o.id)}
+                  onKeyDown={onKeyDown}
+                >
+                  {o.title}
+                </button>
+              ))}
+            </div>
+          ))}
+        </div>
+        <div class="panel op-panel" role="tabpanel" id="op-panel" aria-labelledby={`tab-${op.id}`}>
+          <OperationForm key={`${cluster}:${op.id}`} op={op} />
+        </div>
       </div>
     </section>
   );

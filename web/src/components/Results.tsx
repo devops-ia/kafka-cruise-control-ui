@@ -40,8 +40,13 @@ export function OptimizationView({ data }: { data: any }) {
           />
         )}
       </div>
-      {Array.isArray(data.proposals) && data.proposals.length > 0 && <MovementTable title="Proposed partition movements" movements={data.proposals} />}
       {data.loadBeforeOptimization && data.loadAfterOptimization && <LoadDiff before={data.loadBeforeOptimization} after={data.loadAfterOptimization} />}
+      {Array.isArray(data.proposals) && data.proposals.length > 0 && (
+        <details>
+          <summary>Proposed partition movements ({data.proposals.length})</summary>
+          <MovementTable title="Proposed partition movements" movements={data.proposals} />
+        </details>
+      )}
     </div>
   );
 }

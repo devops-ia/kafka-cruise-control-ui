@@ -52,6 +52,7 @@ type Config struct {
 	Listen              string
 	TLSCert, TLSKey     string
 	PublicURL           string
+	LogoURL             string // app icon and favicon; "" keeps the built-in one
 	SessionKey          string
 	LocalUsers          []LocalUser
 	CookieInsecure      bool
@@ -184,6 +185,13 @@ func Load(env map[string]string) (*Config, error) {
 	if c.PublicURL != "" {
 		if u, err := url.Parse(c.PublicURL); err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 			l.fail("CCUI_PUBLIC_URL", "must be an http(s) URL")
+		}
+	}
+	c.LogoURL = l.g("CCUI_LOGO_URL")
+	if c.LogoURL != "" {
+		// Its origin goes into the CSP, so a host that could break out of img-src is refused.
+		if u, err := url.Parse(c.LogoURL); err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || strings.ContainsAny(u.Host, " ;,'\"") {
+			l.fail("CCUI_LOGO_URL", "must be an http(s) URL")
 		}
 	}
 	c.SessionKey = l.gs("CCUI_SESSION_SECRET")

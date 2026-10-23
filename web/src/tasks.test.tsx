@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/preact";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/preact";
 import { useState } from "preact/hooks";
 import { ResultDialog } from "./components/Dialog";
 import { TaskPanel } from "./components/TaskPanel";
@@ -202,6 +202,46 @@ describe("result dialog", () => {
     fireEvent.click(within(dlg).getByRole("button", { name: "Dismiss" }));
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(tasks.get()).toHaveLength(0);
+  });
+
+  it("finished runs, dry runs too, close after 5 s; errors stay, and hover, focus or an open result pause it", () => {
+    vi.useFakeTimers();
+    const wait = (ms: number) =>
+      act(() => {
+        vi.advanceTimersByTime(ms);
+      });
+    try {
+      const real = { ...done, id: 2, endpoint: "resume_sampling", dryrun: undefined };
+      tasks.set([real, done, { ...done, id: 3, endpoint: "remove_broker", dryrun: "false", state: "error", error: "boom", result: undefined }]);
+      render(<TaskPanel />);
+      wait(4999);
+      expect(tasks.get().map((t) => t.id)).toEqual([2, 1, 3]);
+      wait(1);
+      expect(tasks.get().map((t) => t.id)).toEqual([3]);
+      cleanup();
+
+      tasks.set([done]);
+      render(<TaskPanel />);
+      const panel = screen.getByRole("complementary", { name: "Operations" });
+      fireEvent.pointerEnter(panel);
+      wait(10000);
+      expect(tasks.get()).toHaveLength(1); // paused under the pointer
+      fireEvent.pointerLeave(panel);
+      wait(4999);
+      expect(tasks.get()).toHaveLength(1); // a full 5 s again after leaving
+      fireEvent.click(screen.getByRole("button", { name: "Show result" }));
+      wait(10000);
+      expect(tasks.get()).toHaveLength(1); // not under its open result
+      fireEvent.click(screen.getByRole("button", { name: "Close" }));
+      screen.getByRole("button", { name: "Dismiss" }).focus();
+      wait(10000);
+      expect(tasks.get()).toHaveLength(1); // keyboard focus inside the panel puts it off
+      (document.activeElement as HTMLElement).blur();
+      wait(5000);
+      expect(tasks.get()).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("a running task has neither Show result nor Dismiss; an error task keeps Dismiss", () => {

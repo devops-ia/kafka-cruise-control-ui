@@ -88,10 +88,8 @@ describe("Admin", () => {
     const calls = setup();
     render(<Admin />);
     tab("Remove disks");
-    const d0 = within(await screen.findByRole("group", { name: "Broker 0" }));
-    const d1 = within(screen.getByRole("group", { name: "Broker 1" }));
-    fireEvent.click(d0.getByLabelText("/data/b"));
-    fireEvent.click(d1.getByLabelText("/data/a"));
+    fireEvent.click(await screen.findByLabelText("Broker 0 /data/b"));
+    fireEvent.click(screen.getByLabelText("Broker 1 /data/a"));
     pick("Simulate");
     await vi.waitFor(() => expect(posts(calls)).toHaveLength(1));
     const q = posts(calls)[0].query;
@@ -100,7 +98,8 @@ describe("Admin", () => {
     pick("Execute");
     const dialog = screen.getByRole("alertdialog").textContent!;
     expect(dialog).toContain("prod-b");
-    expect(dialog).toContain("0-/data/b,1-/data/a");
+    const dirs = within(screen.getByRole("alertdialog")).getAllByRole("listitem").map((li) => li.textContent);
+    expect(dirs).toEqual(["0-/data/b", "1-/data/a"]); // one log dir per line
   });
 
   it("a log dir path with a comma is disabled with a note and never sent", async () => {
@@ -108,11 +107,10 @@ describe("Admin", () => {
     const calls = setup("admin", "prod-b", withComma);
     render(<Admin />);
     tab("Remove disks");
-    const g = within(await screen.findByRole("group", { name: "Broker 0" }));
-    const box = g.getByLabelText(/\/data\/a,b/) as HTMLInputElement;
+    const box = (await screen.findByLabelText("Broker 0 /data/a,b")) as HTMLInputElement;
     expect(box.disabled).toBe(true);
-    expect(g.getByText(/path contains a comma, cannot be selected/)).toBeTruthy();
-    fireEvent.click(g.getByLabelText("/data/c"));
+    expect(screen.getByText(/path contains a comma, cannot be selected/)).toBeTruthy();
+    fireEvent.click(screen.getByLabelText("Broker 0 /data/c"));
     pick("Simulate");
     await vi.waitFor(() => expect(posts(calls)).toHaveLength(1));
     expect(posts(calls)[0].query.get("brokerid_and_logdirs")).toBe("0-/data/c");
@@ -122,19 +120,39 @@ describe("Admin", () => {
     const calls = setup();
     render(<Admin />);
     tab("Remove disks");
-    fireEvent.click(within(await screen.findByRole("group", { name: "Broker 0" })).getByLabelText("/data/b"));
+    fireEvent.click(await screen.findByLabelText("Broker 0 /data/b"));
     act(() => setCluster("prod-c"));
-    const box = within(await screen.findByRole("group", { name: "Broker 0" })).getByLabelText("/data/b") as HTMLInputElement;
+    const box = (await screen.findByLabelText("Broker 0 /data/b")) as HTMLInputElement;
     expect(box.checked).toBe(false);
     pick("Simulate");
     expect(posts(calls)).toHaveLength(0);
+  });
+
+  it("remove disks lists many log dirs in a filterable, paged table and keeps the selection across pages", async () => {
+    const many = { 0: Array.from({ length: 8 }, (_, i) => `/data/d${i}`), 1: Array.from({ length: 8 }, (_, i) => `/data/d${i}`) };
+    const calls = setup("admin", "prod-b", { ...clusterState, KafkaBrokerState: { ...clusterState.KafkaBrokerState, OnlineLogDirsByBrokerId: many } });
+    render(<Admin />);
+    tab("Remove disks");
+    const t = within(await screen.findByRole("region", { name: "Log dirs" }));
+    expect(t.getAllByRole("checkbox")).toHaveLength(10);
+    expect(t.getByText("Page 1 of 2")).toBeTruthy();
+    fireEvent.click(t.getByLabelText("Broker 0 /data/d0"));
+    fireEvent.click(t.getByRole("button", { name: "Next" }));
+    fireEvent.click(t.getByLabelText("Broker 1 /data/d7"));
+    expect(screen.getByText("2 of 16 log dirs selected")).toBeTruthy();
+    fireEvent.click(t.getByRole("button", { name: "Filter" }));
+    fireEvent.input(t.getByLabelText("Filter Log dir"), { target: { value: "d3" } });
+    expect(t.getAllByRole("checkbox")).toHaveLength(2);
+    pick("Simulate");
+    await vi.waitFor(() => expect(posts(calls)).toHaveLength(1));
+    expect(posts(calls)[0].query.get("brokerid_and_logdirs")).toBe("0-/data/d0,1-/data/d7");
   });
 
   it("remove disks without a selection sends nothing and says so", async () => {
     const calls = setup();
     render(<Admin />);
     tab("Remove disks");
-    await screen.findByRole("group", { name: "Broker 0" });
+    await screen.findByLabelText("Broker 0 /data/b");
     pick("Simulate");
     expect(screen.getByRole("alert").textContent).toContain("at least one log dir");
     pick("Execute");
@@ -204,11 +222,12 @@ describe("Admin", () => {
     expect(posts(calls)[0].query.get("data_from")).toBe("valid_partitions");
   });
 
-  it("is a horizontal tab bar wired to one labelled tabpanel", () => {
+  it("is a vertical tab list wired to one labelled tabpanel", () => {
     setup();
     render(<Admin />);
     const list = screen.getByRole("tablist");
     expect(list.getAttribute("aria-label")).toBeTruthy();
+    expect(list.getAttribute("aria-orientation")).toBe("vertical");
     const tabs = screen.getAllByRole("tab");
     expect(tabs.filter((t) => t.getAttribute("aria-selected") === "true")).toHaveLength(1);
     expect(tabs.map((t) => t.tabIndex)).toEqual(tabs.map((_, i) => (i === 0 ? 0 : -1))); // roving tabindex
@@ -218,6 +237,19 @@ describe("Admin", () => {
     expect(panel.textContent).toContain("Move replicas and leaders");
     tab("Remove broker");
     expect(screen.getByRole("tabpanel").getAttribute("aria-labelledby")).toBe(screen.getByRole("tab", { name: "Remove broker" }).id);
+  });
+
+  it("moves between tabs with ArrowUp and ArrowDown, wrapping at the ends", () => {
+    setup();
+    render(<Admin />);
+    const all = screen.getAllByRole("tab").map((t) => t.textContent);
+    const sel = () => screen.getByRole("tab", { selected: true });
+    fireEvent.keyDown(sel(), { key: "ArrowDown" });
+    expect(sel().textContent).toBe(all[1]);
+    fireEvent.keyDown(sel(), { key: "ArrowUp" });
+    fireEvent.keyDown(sel(), { key: "ArrowUp" });
+    expect(sel().textContent).toBe(all[all.length - 1]);
+    expect(document.activeElement).toBe(sel());
   });
 
   it("moves between tabs with ArrowLeft, ArrowRight, Home and End, wrapping at the ends", () => {
@@ -239,6 +271,29 @@ describe("Admin", () => {
     expect(sel().textContent).toBe(all[all.length - 1]);
     key("Home");
     expect(sel().textContent).toBe(all[0]);
+  });
+
+  it("groups the tabs under hidden titles in one flat tab order", () => {
+    setup();
+    render(<Admin />);
+    const labels = [...document.querySelectorAll(".op-group-label")];
+    expect(labels.map((l) => l.textContent)).toEqual(["Rebalance", "Disks", "Brokers", "Replicas", "Sampling", "Executions"]);
+    expect(labels.every((l) => l.getAttribute("aria-hidden") === "true")).toBe(true);
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual([
+      "Rebalance",
+      "Preferred leader election",
+      "Rebalance disks",
+      "Remove disks",
+      "Add broker",
+      "Remove broker",
+      "Demote broker",
+      "Fix offline replicas",
+      "Topic replication factor",
+      "Self-healing and concurrency",
+      "Pause sampling",
+      "Resume sampling",
+      "Stop execution",
+    ]);
   });
 
   it("keeps goals in a collapsed details and says what Simulate and Execute do", () => {

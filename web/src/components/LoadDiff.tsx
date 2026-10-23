@@ -1,11 +1,12 @@
 import { useState } from "preact/hooks";
 import { formatMB, formatPct, formatRate } from "../format";
+import { Host } from "../pages/Load";
 import { Tabs } from "./KeyValues";
 import { Table, type Column } from "./Table";
 
 const n = (v: unknown): number | undefined => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
 
-/** Value after, with the value before and a signed percentage change when there is a non-zero previous number. */
+/** Value after, stacked under the value before and over a signed percentage change when there is a non-zero previous number. */
 function Diff({ before, after, fmt }: { before: unknown; after: unknown; fmt: (v: number) => string }) {
   const a = n(after);
   if (a === undefined) return <>{after === undefined || after === null ? "" : String(after)}</>; // e.g. DEAD
@@ -14,7 +15,9 @@ function Diff({ before, after, fmt }: { before: unknown; after: unknown; fmt: (v
   const pct = ((a - b) / b) * 100;
   return (
     <>
-      <span>{fmt(b)}</span> → <span>{fmt(a)}</span> <span class="muted">{`${pct > 0 ? "+" : ""}${pct.toFixed(1)}%`}</span>
+      <div>{fmt(b)}</div>
+      <div>{fmt(a)}</div>
+      <div class={pct > 0 ? "up" : pct < 0 ? "down" : "muted"}>{`${pct > 0 ? "+" : ""}${pct.toFixed(1)}%`}</div>
     </>
   );
 }
@@ -54,41 +57,50 @@ export function LoadDiff({ before, after }: { before: any; after: any }) {
   const diskMetrics: [string, string, (v: number) => string][] = [["NumReplicas", "Replicas", String], ["NumLeaderReplicas", "Leaders", String], ["DiskMB", "Disk used", formatMB], ["DiskPct", "Disk %", formatPct]];
   return (
     <div class="stack">
-      <Tabs label="Load group by" value={view} onChange={setView} options={[["broker", "By broker"], ["host", "By host"]]} />
-      {view === "broker" ? (
-        <Table
-          caption="Load before and after by broker"
-          rows={brokers}
-          rowKey={(r) => r.after.Broker}
-          filterable={false}
-          columns={[
-            { key: "Broker", header: "Broker", value: (r) => r.after.Broker ?? "", numeric: true },
-            { key: "Host", header: "Host", value: (r) => String(r.after.Host ?? "") },
-            { key: "BrokerState", header: "State", value: (r) => String(r.after.BrokerState ?? "") },
-            ...metricCols((r) => oldBrokers.get(r.after.Broker)),
-          ]}
-        />
-      ) : (
-        <Table
-          caption="Load before and after by host"
-          rows={hosts}
-          rowKey={(r) => r.after.Host}
-          filterable={false}
-          columns={[{ key: "Host", header: "Host", value: (r) => String(r.after.Host ?? "") }, ...metricCols((r) => oldHosts.get(r.after.Host))]}
-        />
-      )}
+      <details>
+        <summary>Load before and after</summary>
+        <Tabs label="Load group by" value={view} onChange={setView} options={[["broker", "By broker"], ["host", "By host"]]} />
+        {view === "broker" ? (
+          <Table
+            caption="Load before and after by broker"
+            rows={brokers}
+            rowKey={(r) => r.after.Broker}
+            filterable={false}
+            pageable
+            columns={[
+              { key: "Broker", header: "Broker", value: (r) => r.after.Broker ?? "", numeric: true },
+              { key: "Host", header: "Host", value: (r) => String(r.after.Host ?? ""), render: (r) => <Host name={String(r.after.Host ?? "")} /> },
+              { key: "BrokerState", header: "State", value: (r) => String(r.after.BrokerState ?? "") },
+              ...metricCols((r) => oldBrokers.get(r.after.Broker)),
+            ]}
+          />
+        ) : (
+          <Table
+            caption="Load before and after by host"
+            rows={hosts}
+            rowKey={(r) => r.after.Host}
+            filterable={false}
+            pageable
+            columns={[{ key: "Host", header: "Host", value: (r) => String(r.after.Host ?? ""), render: (r) => <Host name={String(r.after.Host ?? "")} /> }, ...metricCols((r) => oldHosts.get(r.after.Host))]}
+          />
+        )}
+      </details>
       {disks.length > 0 && (
-        <Table
-          caption="Load by disk"
-          rows={disks}
-          rowKey={(r) => `${r.broker}-${r.dir}`}
-          filterable={false}
-          columns={[
-            { key: "broker", header: "Broker", value: (r) => r.broker ?? "", numeric: true },
-            { key: "dir", header: "Log dir", value: (r) => r.dir },
-            ...diskMetrics.map(([key, header, fmt]): Column<any> => ({ key, header, numeric: true, value: (r) => r.after[key] ?? "", render: (r) => <Diff before={r.before?.[key]} after={r.after[key]} fmt={fmt} /> })),
-          ]}
-        />
+        <details>
+          <summary>Load by disk ({disks.length})</summary>
+          <Table
+            caption="Load by disk"
+            rows={disks}
+            rowKey={(r) => `${r.broker}-${r.dir}`}
+            filterable={false}
+            pageable
+            columns={[
+              { key: "broker", header: "Broker", value: (r) => r.broker ?? "", numeric: true },
+              { key: "dir", header: "Log dir", value: (r) => r.dir },
+              ...diskMetrics.map(([key, header, fmt]): Column<any> => ({ key, header, numeric: true, value: (r) => r.after[key] ?? "", render: (r) => <Diff before={r.before?.[key]} after={r.after[key]} fmt={fmt} /> })),
+            ]}
+          />
+        </details>
       )}
     </div>
   );

@@ -197,11 +197,23 @@ h2 {
   color: var(--rail-active-text);
   border-bottom: 1px solid var(--rail-active);
 }
+.build {
+  display: block;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--rail-text);
+}
 .mark {
   width: 14px;
   height: 14px;
   background: var(--accent);
   border-radius: var(--radius);
+}
+.mark.logo {
+  width: 20px;
+  height: 20px;
+  background: none;
+  object-fit: contain;
 }
 .sidebar h2 {
   font-size: 10.5px;
@@ -408,6 +420,26 @@ label {
 .cluster-select select {
   font-family: var(--mono);
 }
+/* Chromium base-select: the list opens below the control from the first group instead of over the chosen option. */
+#cluster,
+#cluster::picker(select) {
+  appearance: base-select;
+}
+#cluster::picker(select) {
+  max-height: 60vh;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+#cluster optgroup {
+  font-weight: 600;
+  color: var(--muted);
+}
+#cluster option {
+  font-weight: normal;
+  color: var(--ink);
+}
 
 /* Data */
 .table-wrap {
@@ -430,6 +462,13 @@ caption .caption-row {
   display: flex;
   align-items: center;
   gap: var(--s3);
+}
+.pager {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s3);
+  padding: var(--s2) var(--s3);
 }
 th,
 td {
@@ -489,6 +528,12 @@ tr.nested td {
 }
 .muted {
   color: var(--muted);
+}
+.up {
+  color: var(--bad);
+}
+.down {
+  color: var(--ok);
 }
 .mono {
   font-family: var(--mono);
@@ -749,14 +794,64 @@ progress.bar::-moz-progress-bar {
 }
 
 /* Admin */
-.op-tabs {
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  margin-bottom: var(--s4);
+/* Operations list on the left, the form on the right; styled like the main sidebar */
+.op-layout {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: var(--s4);
+  align-items: start;
 }
-.op-tabs button {
-  flex: none;
-  white-space: nowrap;
+.op-nav {
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 64px; /* below the sticky topbar */
+  padding: var(--s1) 0 var(--s2);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.op-group {
+  display: flex;
+  flex-direction: column;
+}
+.op-group:not(:has(.op-group-label)) {
+  margin-top: var(--s2);
+}
+.op-group-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: var(--s3) var(--s3) var(--s1);
+}
+.op-nav button {
+  text-align: left;
+  background: none;
+  border: 0;
+  border-left: 2px solid transparent;
+  border-radius: 0;
+  padding: 6px var(--s3);
+  color: var(--muted);
+}
+.op-nav button:hover:not(:disabled) {
+  color: var(--ink);
+  background: var(--sunken);
+}
+.op-nav button[aria-selected="true"] {
+  color: var(--ink);
+  font-weight: 600;
+  background: var(--sunken);
+  border-left-color: var(--accent);
+}
+@media (max-width: 800px) {
+  .op-layout {
+    grid-template-columns: 1fr;
+  }
+  .op-nav {
+    position: static;
+  }
 }
 .op-head p {
   margin: var(--s1) 0 0;
@@ -790,6 +885,12 @@ progress.bar::-moz-progress-bar {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--s4);
   margin-top: var(--s3);
+}
+.logdirs {
+  align-self: stretch; /* .field shrinks its content; this table spans the form like the header above it */
+}
+.logdir {
+  overflow-wrap: anywhere; /* long paths wrap instead of widening the table */
 }
 .goal-groups fieldset {
   border: 1px solid var(--line);
@@ -835,7 +936,26 @@ progress.bar::-moz-progress-bar {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: var(--s5);
-  width: min(520px, calc(100vw - 32px));
+  width: min(720px, calc(100vw - 32px));
+}
+/* The confirm summary holds names and paths, not big figures */
+.dialog .stats {
+  display: flex;
+  flex-wrap: wrap;
+}
+.dialog .stats > div {
+  flex: 1 1 150px;
+}
+.dialog .stats > .wide {
+  flex-basis: 100%;
+}
+.dialog .stats dd {
+  font-size: 14px;
+}
+.dialog .plain {
+  list-style: none;
+  margin: 0;
+  padding: 0;
 }
 .dialog h2 {
   margin-top: 0;

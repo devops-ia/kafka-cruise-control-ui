@@ -124,10 +124,10 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			params := map[string]string{}
 			for k, v := range r.URL.Query() {
-				params[k] = logSafe.Replace(strings.Join(v, ","))
+				params[logSafe.Replace(k)] = logSafe.Replace(strings.Join(v, ","))
 			}
-			p.audit.Info("audit", "user", u.Name, "role", u.Role.String(), "cluster", p.cluster.Name, "endpoint", name,
-				"dryrun", r.URL.Query().Get("dryrun"), "params", params, "status", sw.status)
+			p.audit.Info("audit", "user", u.Name, "role", u.Role.String(), "cluster", p.cluster.Name, "endpoint", logSafe.Replace(name),
+				"dryrun", params["dryrun"], "params", params, "status", sw.status)
 		}()
 	}
 	// The role gate comes before the method check so a viewer gets 403 for any POST; unknown endpoints still answer 404.

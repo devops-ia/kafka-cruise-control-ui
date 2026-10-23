@@ -270,15 +270,24 @@ func TestAuditParamsStayOnOneLine(t *testing.T) {
 	p := New(config.Cluster{Name: "a", URL: u, Timeout: time.Second}, http.DefaultTransport, slog.New(slog.NewJSONHandler(&buf, nil)), 1024)
 	mux := http.NewServeMux()
 	mux.Handle("/api/clusters/{name}/proxy/{endpoint}", p)
-	req := httptest.NewRequest("POST", "/api/clusters/a/proxy/rebalance?dryrun=true&reason=a%0Ab%0Dc", nil)
+	req := httptest.NewRequest("POST", "/api/clusters/a/proxy/rebalance?dryrun=true%0Ax&reason=a%0Ab%0Dc&k%0Ay=1", nil)
 	req = req.WithContext(auth.WithUser(req.Context(), auth.User{Name: "ana", Role: auth.Admin}))
 	mux.ServeHTTP(httptest.NewRecorder(), req)
 
-	var line struct{ Params map[string]string }
+	var line struct {
+		Dryrun string
+		Params map[string]string
+	}
 	if err := json.Unmarshal(buf.Bytes(), &line); err != nil {
 		t.Fatal(err)
 	}
 	if got := line.Params["reason"]; got != "a b c" {
 		t.Fatalf("reason logged as %q", got)
+	}
+	if line.Dryrun != "true x" {
+		t.Fatalf("dryrun logged as %q", line.Dryrun)
+	}
+	if _, ok := line.Params["k y"]; !ok {
+		t.Fatalf("parameter name not cleaned: %v", line.Params)
 	}
 }

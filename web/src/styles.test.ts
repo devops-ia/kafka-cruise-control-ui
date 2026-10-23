@@ -26,6 +26,10 @@ describe("styles.css", () => {
     expect(Number.parseFloat(tokens(":root")["--radius"])).toBeLessThanOrEqual(4);
   });
 
+  it("opens the cluster picker as a base-select list", () => {
+    expect(css).toMatch(/#cluster,\s*#cluster::picker\(select\)\s*\{[^}]*appearance:\s*base-select;/);
+  });
+
   it("uses system fonts only", () => {
     expect(css).not.toMatch(/@font-face|@import|url\(/);
   });
@@ -34,7 +38,7 @@ describe("styles.css", () => {
   const PAIRS: [string, string, number][] = [
     ["--ink", "--bg", 4.5], ["--ink", "--surface", 4.5], ["--muted", "--bg", 4.5], ["--muted", "--surface", 4.5], ["--muted", "--sunken", 4.5],
     ["--accent", "--surface", 4.5], ["--accent", "--sunken", 4.5], ["--on-accent", "--accent", 4.5], ["--on-danger", "--danger", 4.5],
-    ["--ok", "--ok-bg", 4.5], ["--warn", "--warn-bg", 4.5], ["--bad", "--bad-bg", 4.5],
+    ["--ok", "--ok-bg", 4.5], ["--ok", "--surface", 4.5], ["--bad", "--surface", 4.5], ["--warn", "--warn-bg", 4.5], ["--bad", "--bad-bg", 4.5],
     ["--rail-text", "--rail", 4.5], ["--rail-label", "--rail", 4.5], ["--rail-active-text", "--rail-active", 4.5], ["--rail-focus", "--rail", 3],
     ["--control-border", "--surface", 3], ["--accent", "--bg", 3],
   ];
