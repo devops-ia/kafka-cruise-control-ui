@@ -53,7 +53,7 @@ function LogDirPicker({ value, onChange }: { value: string; onChange: (v: string
   // One row per log dir in the shared table, so it filters, pages and grows down; the selection lives in value and survives both.
   const rows = ids.flatMap((id) => dirs[id].map((d) => ({ id, d, key: `${id}-${d}` })));
   return (
-    <div class="stack">
+    <div class="stack logdirs">
       <p class="muted" aria-live="polite">
         {chosen.size} of {rows.length} log dirs selected
       </p>
