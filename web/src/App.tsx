@@ -127,7 +127,7 @@ function Shell({ children }: { children: ComponentChildren }) {
           {logo() ? <img class="mark logo" src={logo()} alt="" /> : <span class="mark" aria-hidden="true" />}
           <div>
             Cruise Control
-            <small class="build">(build: {import.meta.env.VITE_VERSION || "dev"})</small>
+            <small class="build">{import.meta.env.VITE_VERSION || "dev"}</small>
           </div>
         </div>
         {GROUPS.map((g) => ({ g, routes: ROUTES.filter((r) => r.group === g && (!r.admin || isAdmin(s)) && !(off && r.path === "/review")) }))

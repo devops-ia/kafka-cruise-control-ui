@@ -111,7 +111,7 @@ describe("App", () => {
     render(<App />);
     expect((await links()).length).toBe(10);
     // the build's version sits under the title; tests build without one
-    expect(document.querySelector(".brand .build")?.textContent).toBe("(build: dev)");
+    expect(document.querySelector(".brand .build")?.textContent).toBe("dev");
     expect(document.querySelector(".brand img")).toBeNull(); // no CCUI_LOGO_URL: the built-in mark
     cleanup();
     const icon = Object.assign(document.createElement("link"), { rel: "icon" });
