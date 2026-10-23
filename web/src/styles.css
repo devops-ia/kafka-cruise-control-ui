@@ -886,6 +886,9 @@ progress.bar::-moz-progress-bar {
   gap: var(--s4);
   margin-top: var(--s3);
 }
+.logdir {
+  overflow-wrap: anywhere; /* long paths wrap instead of widening the table */
+}
 .goal-groups fieldset {
   border: 1px solid var(--line);
   border-radius: var(--radius);

@@ -1,5 +1,6 @@
 import { useRef, useState } from "preact/hooks";
 import { ConfirmDialog } from "../components/Dialog";
+import { Table } from "../components/Table";
 import { useGoals } from "../goals";
 import { useResource } from "../hooks";
 import { buildParams, OPERATIONS, type Field, type Operation, type Values } from "../ops";
@@ -49,19 +50,39 @@ function LogDirPicker({ value, onChange }: { value: string; onChange: (v: string
   const dirs: Record<string, string[]> = res.data.KafkaBrokerState?.OnlineLogDirsByBrokerId ?? {};
   const ids = Object.keys(dirs).sort((a, b) => Number(a) - Number(b));
   if (ids.length === 0) return <p class="muted">This cluster does not report any log dirs, so there is nothing to choose. Cruise Control needs a Kafka version that returns them.</p>;
+  // One row per log dir in the shared table, so it filters, pages and grows down; the selection lives in value and survives both.
+  const rows = ids.flatMap((id) => dirs[id].map((d) => ({ id, d, key: `${id}-${d}` })));
   return (
-    <div class="goal-groups">
-      {ids.map((id) => (
-        <fieldset key={id}>
-          <legend>Broker {id}</legend>
-          {dirs[id].map((d) => (
-            <label key={d} class="check">
-              <input type="checkbox" checked={chosen.has(`${id}-${d}`)} disabled={d.includes(",")} onChange={() => toggle(`${id}-${d}`)} /> {d}
-              {d.includes(",") && <small class="muted"> (path contains a comma, cannot be selected)</small>}
-            </label>
-          ))}
-        </fieldset>
-      ))}
+    <div class="stack">
+      <p class="muted" aria-live="polite">
+        {chosen.size} of {rows.length} log dirs selected
+      </p>
+      <Table
+        caption="Log dirs"
+        rows={rows}
+        rowKey={(r) => r.key}
+        pageable
+        columns={[
+          {
+            key: "pick",
+            header: "Remove",
+            value: (r) => (chosen.has(r.key) ? 1 : 0),
+            render: (r) => <input type="checkbox" aria-label={`Broker ${r.id} ${r.d}`} checked={chosen.has(r.key)} disabled={r.d.includes(",")} onChange={() => toggle(r.key)} />,
+          },
+          { key: "broker", header: "Broker", value: (r) => Number(r.id), numeric: true },
+          {
+            key: "dir",
+            header: "Log dir",
+            value: (r) => r.d,
+            render: (r) => (
+              <span class="logdir">
+                {r.d}
+                {r.d.includes(",") && <small class="muted"> (path contains a comma, cannot be selected)</small>}
+              </span>
+            ),
+          },
+        ]}
+      />
     </div>
   );
 }

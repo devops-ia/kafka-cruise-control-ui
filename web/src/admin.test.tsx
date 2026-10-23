@@ -88,10 +88,8 @@ describe("Admin", () => {
     const calls = setup();
     render(<Admin />);
     tab("Remove disks");
-    const d0 = within(await screen.findByRole("group", { name: "Broker 0" }));
-    const d1 = within(screen.getByRole("group", { name: "Broker 1" }));
-    fireEvent.click(d0.getByLabelText("/data/b"));
-    fireEvent.click(d1.getByLabelText("/data/a"));
+    fireEvent.click(await screen.findByLabelText("Broker 0 /data/b"));
+    fireEvent.click(screen.getByLabelText("Broker 1 /data/a"));
     pick("Simulate");
     await vi.waitFor(() => expect(posts(calls)).toHaveLength(1));
     const q = posts(calls)[0].query;
@@ -108,11 +106,10 @@ describe("Admin", () => {
     const calls = setup("admin", "prod-b", withComma);
     render(<Admin />);
     tab("Remove disks");
-    const g = within(await screen.findByRole("group", { name: "Broker 0" }));
-    const box = g.getByLabelText(/\/data\/a,b/) as HTMLInputElement;
+    const box = (await screen.findByLabelText("Broker 0 /data/a,b")) as HTMLInputElement;
     expect(box.disabled).toBe(true);
-    expect(g.getByText(/path contains a comma, cannot be selected/)).toBeTruthy();
-    fireEvent.click(g.getByLabelText("/data/c"));
+    expect(screen.getByText(/path contains a comma, cannot be selected/)).toBeTruthy();
+    fireEvent.click(screen.getByLabelText("Broker 0 /data/c"));
     pick("Simulate");
     await vi.waitFor(() => expect(posts(calls)).toHaveLength(1));
     expect(posts(calls)[0].query.get("brokerid_and_logdirs")).toBe("0-/data/c");
@@ -122,19 +119,39 @@ describe("Admin", () => {
     const calls = setup();
     render(<Admin />);
     tab("Remove disks");
-    fireEvent.click(within(await screen.findByRole("group", { name: "Broker 0" })).getByLabelText("/data/b"));
+    fireEvent.click(await screen.findByLabelText("Broker 0 /data/b"));
     act(() => setCluster("prod-c"));
-    const box = within(await screen.findByRole("group", { name: "Broker 0" })).getByLabelText("/data/b") as HTMLInputElement;
+    const box = (await screen.findByLabelText("Broker 0 /data/b")) as HTMLInputElement;
     expect(box.checked).toBe(false);
     pick("Simulate");
     expect(posts(calls)).toHaveLength(0);
+  });
+
+  it("remove disks lists many log dirs in a filterable, paged table and keeps the selection across pages", async () => {
+    const many = { 0: Array.from({ length: 8 }, (_, i) => `/data/d${i}`), 1: Array.from({ length: 8 }, (_, i) => `/data/d${i}`) };
+    const calls = setup("admin", "prod-b", { ...clusterState, KafkaBrokerState: { ...clusterState.KafkaBrokerState, OnlineLogDirsByBrokerId: many } });
+    render(<Admin />);
+    tab("Remove disks");
+    const t = within(await screen.findByRole("region", { name: "Log dirs" }));
+    expect(t.getAllByRole("checkbox")).toHaveLength(10);
+    expect(t.getByText("Page 1 of 2")).toBeTruthy();
+    fireEvent.click(t.getByLabelText("Broker 0 /data/d0"));
+    fireEvent.click(t.getByRole("button", { name: "Next" }));
+    fireEvent.click(t.getByLabelText("Broker 1 /data/d7"));
+    expect(screen.getByText("2 of 16 log dirs selected")).toBeTruthy();
+    fireEvent.click(t.getByRole("button", { name: "Filter" }));
+    fireEvent.input(t.getByLabelText("Filter Log dir"), { target: { value: "d3" } });
+    expect(t.getAllByRole("checkbox")).toHaveLength(2);
+    pick("Simulate");
+    await vi.waitFor(() => expect(posts(calls)).toHaveLength(1));
+    expect(posts(calls)[0].query.get("brokerid_and_logdirs")).toBe("0-/data/d0,1-/data/d7");
   });
 
   it("remove disks without a selection sends nothing and says so", async () => {
     const calls = setup();
     render(<Admin />);
     tab("Remove disks");
-    await screen.findByRole("group", { name: "Broker 0" });
+    await screen.findByLabelText("Broker 0 /data/b");
     pick("Simulate");
     expect(screen.getByRole("alert").textContent).toContain("at least one log dir");
     pick("Execute");
