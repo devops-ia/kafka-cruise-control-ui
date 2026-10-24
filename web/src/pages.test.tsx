@@ -344,13 +344,49 @@ describe("result tables", () => {
     return calls;
   };
   const block = (summary: string) => screen.getByText(summary, { selector: "summary" }).closest("details")!;
-  // Opens a closed block and returns it.
+  // Opens a block if it is closed and returns it.
   const expand = (summary: string) => {
     const d = block(summary);
-    expect(d.open).toBe(false);
     d.open = true;
     return d;
   };
+  const still = { numReplicaMovements: 0, numIntraBrokerReplicaMovements: 0, numLeaderMovements: 0, dataToMoveMB: 0, onDemandBalancednessScoreBefore: 90.04, onDemandBalancednessScoreAfter: 90.01 };
+
+  it("Proposals opens load and movements when the result has changes, and keeps Load by disk closed", async () => {
+    await viewProposals();
+    expect(block("Load before and after").open).toBe(true);
+    expect(block("Proposed partition movements (2)").open).toBe(true);
+    expect(block("Load by disk (2)").open).toBe(false);
+  });
+
+  it("Proposals keeps load and movements closed without changes", async () => {
+    await viewProposals({ ...optimizationVerbose, summary: still });
+    expect(block("Load before and after").open).toBe(false);
+    expect(block("Proposed partition movements (2)").open).toBe(false);
+  });
+
+  it("Proposals opens the load on any single change", async () => {
+    const even = { ...still, onDemandBalancednessScoreBefore: 90, onDemandBalancednessScoreAfter: 90 };
+    for (const change of [{ numReplicaMovements: 1 }, { numIntraBrokerReplicaMovements: 1 }, { numLeaderMovements: 1 }, { dataToMoveMB: 0.5 }, { onDemandBalancednessScoreBefore: 80.0, onDemandBalancednessScoreAfter: 95.0 }]) {
+      await viewProposals({ ...optimizationVerbose, summary: { ...even, ...change } });
+      expect(block("Load before and after").open).toBe(true);
+      cleanup();
+    }
+  });
+
+  it("Proposals keeps the load closed when balancedness and figures are missing", async () => {
+    await viewProposals({ ...optimizationVerbose, summary: { numLeaderMovements: 0 } });
+    expect(block("Load before and after").open).toBe(false);
+  });
+
+  it("a movements block the user closes stays closed while the load tab changes", async () => {
+    await viewProposals();
+    const moves = block("Proposed partition movements (2)");
+    moves.open = false;
+    fireEvent.click(screen.getByRole("button", { name: "By host" }));
+    expect(screen.getByRole("region", { name: "Load before and after by host" })).toBeTruthy();
+    expect(moves.open).toBe(false);
+  });
 
   it("Proposals lists partition movements, marks removed and added replicas, and filters by topic", async () => {
     await viewProposals();

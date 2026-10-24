@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { useState } from "preact/hooks";
 import { ResultDialog } from "./components/Dialog";
 import { TaskPanel } from "./components/TaskPanel";
-import { optimization } from "./fixtures";
+import { optimization, optimizationVerbose } from "./fixtures";
 import { PeerReview } from "./pages/PeerReview";
 import { UserTasks } from "./pages/UserTasks";
 import { session } from "./session";
@@ -140,6 +140,15 @@ describe("result dialog", () => {
     expect(screen.getByRole("button", { name: "Close" })).toBeTruthy();
     expect(screen.getAllByRole("button", { name: "Dismiss" }).length).toBe(2);
     expect(screen.queryByRole("button", { name: "Hide result" })).toBeNull();
+  });
+
+  it("the result dialog opens load and movements of a dry run with changes, and keeps Load by disk closed", () => {
+    tasks.set([{ ...done, result: optimizationVerbose }]);
+    render(<TaskPanel />);
+    fireEvent.click(screen.getByRole("button", { name: "Show result" }));
+    const dlg = screen.getByRole("dialog");
+    const block = (summary: string) => (within(dlg).getByText(summary, { selector: "summary" }).closest("details") as HTMLDetailsElement).open;
+    expect([block("Load before and after"), block("Proposed partition movements (2)"), block("Load by disk (2)")]).toEqual([true, true, false]);
   });
 
   it("Close and Escape keep the task and return focus to Show result", () => {

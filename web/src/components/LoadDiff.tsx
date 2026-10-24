@@ -44,7 +44,7 @@ const metricCols = (before: (r: any) => any): Column<any>[] =>
 const list = (v: any): any[] => (Array.isArray(v) ? v : []);
 
 /** Load before and after an optimization, by broker or host, plus one row per disk when brokers carry DiskState. */
-export function LoadDiff({ before, after }: { before: any; after: any }) {
+export function LoadDiff({ before, after, open }: { before: any; after: any; open: boolean }) {
   const [view, setView] = useState<"broker" | "host">("broker");
   const old = (items: any, key: string) => new Map(list(items).map((b) => [b?.[key], b]));
   const oldBrokers = old(before?.brokers, "Broker");
@@ -57,7 +57,7 @@ export function LoadDiff({ before, after }: { before: any; after: any }) {
   const diskMetrics: [string, string, (v: number) => string][] = [["NumReplicas", "Replicas", String], ["NumLeaderReplicas", "Leaders", String], ["DiskMB", "Disk used", formatMB], ["DiskPct", "Disk %", formatPct]];
   return (
     <div class="stack">
-      <details>
+      <details open={open}>
         <summary>Load before and after</summary>
         <Tabs label="Load group by" value={view} onChange={setView} options={[["broker", "By broker"], ["host", "By host"]]} />
         {view === "broker" ? (

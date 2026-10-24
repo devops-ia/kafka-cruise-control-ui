@@ -17,6 +17,10 @@ export function OptimizationView({ data }: { data: any }) {
     ["Balancedness after", s.onDemandBalancednessScoreAfter !== undefined ? Number(s.onDemandBalancednessScoreAfter).toFixed(1) : "-"],
   ];
   const goals: { goal: string; status: string }[] = data.goalSummary ?? [];
+  const [before, after] = [s.onDemandBalancednessScoreBefore, s.onDemandBalancednessScoreAfter];
+  const changed =
+    ["numReplicaMovements", "numIntraBrokerReplicaMovements", "numLeaderMovements", "dataToMoveMB"].some((k) => (s[k] ?? 0) > 0) ||
+    (before !== undefined && after !== undefined && Number(before).toFixed(1) !== Number(after).toFixed(1));
   return (
     <div class="stack">
       <div class={goals.length > 0 ? "two-col" : undefined}>
@@ -40,9 +44,9 @@ export function OptimizationView({ data }: { data: any }) {
           />
         )}
       </div>
-      {data.loadBeforeOptimization && data.loadAfterOptimization && <LoadDiff before={data.loadBeforeOptimization} after={data.loadAfterOptimization} />}
+      {data.loadBeforeOptimization && data.loadAfterOptimization && <LoadDiff before={data.loadBeforeOptimization} after={data.loadAfterOptimization} open={changed} />}
       {Array.isArray(data.proposals) && data.proposals.length > 0 && (
-        <details>
+        <details open={changed}>
           <summary>Proposed partition movements ({data.proposals.length})</summary>
           <MovementTable title="Proposed partition movements" movements={data.proposals} />
         </details>
