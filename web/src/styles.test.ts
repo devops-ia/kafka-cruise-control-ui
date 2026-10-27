@@ -26,8 +26,11 @@ describe("styles.css", () => {
     expect(Number.parseFloat(tokens(":root")["--radius"])).toBeLessThanOrEqual(4);
   });
 
-  it("opens the cluster picker as a base-select list", () => {
-    expect(css).toMatch(/#cluster,\s*#cluster::picker\(select\)\s*\{[^}]*appearance:\s*base-select;/);
+  it("caps the cluster list at 60vh with its own scroll and drops base-select", () => {
+    expect(css).not.toContain("base-select");
+    const rule = css.match(/\.cluster-list \{([^}]*)\}/)?.[1];
+    expect(rule).toMatch(/max-height:\s*60vh;/);
+    expect(rule).toMatch(/overflow-y:\s*auto;/);
   });
 
   it("uses system fonts only", () => {

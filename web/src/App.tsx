@@ -1,5 +1,5 @@
 import type { ComponentChildren } from "preact";
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import { cc, logout } from "./api";
 import { loadClusters, useClusters } from "./clusters";
 import { TaskPanel } from "./components/TaskPanel";
@@ -71,22 +71,75 @@ function ClusterSelect() {
   const health = useHealth();
   const groups = [...new Set(clusters.map((c) => c.group ?? ""))];
   const state = health[selected];
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  const toggle = useRef<HTMLButtonElement>(null);
+  const text = (name: string) => (health[name] === "error" ? `${name} (unreachable)` : name);
+  const close = () => {
+    setOpen(false);
+    toggle.current?.focus();
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    box.current?.querySelector<HTMLElement>('[aria-current="true"]')?.focus();
+    const outside = (e: PointerEvent) => !box.current?.contains(e.target as Node) && setOpen(false);
+    document.addEventListener("pointerdown", outside);
+    return () => document.removeEventListener("pointerdown", outside);
+  }, [open]);
+
+  const onKey = (e: KeyboardEvent) => {
+    if (!open) return;
+    if (e.key === "Escape") {
+      e.stopPropagation();
+      close();
+    }
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      const items = [...(box.current?.querySelectorAll<HTMLElement>(".cluster-list button") ?? [])];
+      items[items.indexOf(document.activeElement as HTMLElement) + (e.key === "ArrowDown" ? 1 : -1)]?.focus();
+    }
+  };
+
   return (
-    <div class="cluster-select">
-      <label for="cluster">Cluster</label>
-      <select id="cluster" value={selected} onChange={(e) => setCluster((e.target as HTMLSelectElement).value)}>
-        {groups.map((g) => (
-          <optgroup key={g} label={g || "Ungrouped"}>
-            {clusters
-              .filter((c) => (c.group ?? "") === g)
-              .map((c) => (
-                <option key={c.name} value={c.name}>
-                  {health[c.name] === "error" ? `${c.name} (unreachable)` : c.name}
-                </option>
-              ))}
-          </optgroup>
-        ))}
-      </select>
+    <div
+      ref={box}
+      class="cluster-select"
+      onKeyDown={onKey}
+      // Null relatedTarget is a click in Safari/Firefox on macOS (buttons do not take focus); the pointerdown listener handles clicks.
+      onFocusOut={(e) => open && e.relatedTarget && !box.current?.contains(e.relatedTarget as Node) && setOpen(false)}
+    >
+      {/* No "for": a native label would replace the button's own text in its aria-labelledby name. */}
+      <label id="cluster-label">Cluster</label>
+      <button ref={toggle} type="button" id="cluster" aria-labelledby="cluster-label cluster" aria-expanded={open} onClick={() => setOpen(!open)}>
+        {text(selected)}
+      </button>
+      {open && (
+        <div class="cluster-list">
+          {groups.map((g, i) => (
+            <div key={g} role="group" aria-labelledby={`cluster-group-${i}`}>
+              <div id={`cluster-group-${i}`} class="cluster-group">
+                {g || "Ungrouped"}
+              </div>
+              {clusters
+                .filter((c) => (c.group ?? "") === g)
+                .map((c) => (
+                  <button
+                    key={c.name}
+                    type="button"
+                    aria-current={c.name === selected ? "true" : undefined}
+                    onClick={() => {
+                      setCluster(c.name);
+                      close();
+                    }}
+                  >
+                    {text(c.name)}
+                  </button>
+                ))}
+            </div>
+          ))}
+        </div>
+      )}
       <span class={`dot ${state ?? "unknown"}`} role="img" aria-label={state === "ok" ? "Cluster reachable" : state === "error" ? "Cluster unreachable" : "Checking cluster"} />
     </div>
   );
