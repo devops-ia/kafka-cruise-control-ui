@@ -413,32 +413,42 @@ label {
   flex-wrap: wrap;
 }
 .cluster-select {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--s2);
 }
-.cluster-select select {
+.cluster-select button {
   font-family: var(--mono);
 }
-/* Chromium base-select: the list opens below the control from the first group instead of over the chosen option. */
-#cluster,
-#cluster::picker(select) {
-  appearance: base-select;
-}
-#cluster::picker(select) {
+.cluster-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 1;
   max-height: 60vh;
+  max-width: calc(100vw - 2 * var(--s3));
   overflow-y: auto;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface);
 }
-#cluster optgroup {
+.cluster-group {
+  padding: var(--s1) var(--s3);
   font-weight: 600;
   color: var(--muted);
 }
-#cluster option {
-  font-weight: normal;
-  color: var(--ink);
+.cluster-list button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+.cluster-list button[aria-current="true"] {
+  font-weight: 600;
+  background: var(--sunken);
 }
 
 /* Data */

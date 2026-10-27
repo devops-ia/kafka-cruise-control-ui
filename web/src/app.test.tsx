@@ -1,5 +1,6 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/preact";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/preact";
 import { App } from "./App";
+import { clusters } from "./clusters";
 import { load } from "./fixtures";
 import { navigate } from "./router";
 import { session } from "./session";
@@ -71,9 +72,86 @@ describe("App", () => {
     });
     navigate("/load");
     render(<App />);
-    await screen.findByRole("option", { name: "b" });
-    fireEvent.change(screen.getByLabelText("Cluster"), { target: { value: "b" } });
+    fireEvent.click(await screen.findByRole("button", { name: "Cluster a" }));
+    fireEvent.click(await screen.findByRole("button", { name: "b" }));
     expect(localStorage.getItem("ccui.cluster")).toBe("b");
+    expect(screen.getByRole("button", { name: "Cluster b" })).toBeTruthy();
+  });
+
+  it("opens its own cluster list from the first group and drives it from the keyboard", async () => {
+    localStorage.clear();
+    setCluster("c");
+    const list = [{ name: "a", group: "prod" }, { name: "b", group: "dev" }, { name: "c" }];
+    clusters.set(list); // not the previous test's list while /api/clusters is in flight
+    mockFetch((c) => {
+      if (c.path === "/api/session") return { body: { authenticated: true, mode: "none", user: "anonymous", role: "admin", csrfToken: "t" } };
+      if (c.path === "/api/clusters") return { body: list };
+      return { body: {} };
+    });
+    navigate("/load");
+    render(<App />);
+    const toggle = await screen.findByRole("button", { name: "Cluster c" });
+    expect(document.querySelector("select#cluster")).toBeNull();
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(toggle);
+    await screen.findByRole("button", { name: "c" });
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    const box = document.querySelector(".cluster-list")!;
+    expect([...box.querySelectorAll("[id], button")].map((e) => e.textContent)).toEqual(["prod", "a", "dev", "b", "Ungrouped", "c"]);
+    for (const g of ["prod", "dev", "Ungrouped"]) expect(screen.getByRole("group", { name: g })).toBeTruthy();
+    expect([...box.querySelectorAll('[aria-current="true"]')].map((e) => e.textContent)).toEqual(["c"]);
+    await waitFor(() => expect(document.activeElement?.textContent).toBe("c"));
+
+    fireEvent.keyDown(document.activeElement!, { key: "ArrowUp" });
+    expect(document.activeElement?.textContent).toBe("b");
+    fireEvent.keyDown(document.activeElement!, { key: "ArrowDown" });
+    expect(document.activeElement?.textContent).toBe("c");
+    fireEvent.keyDown(document.activeElement!, { key: "ArrowDown" }); // no wrap at the end
+    expect(document.activeElement?.textContent).toBe("c");
+
+    // Safari and Firefox on macOS blur on mousedown over a button: focusout with no relatedTarget must not close the list.
+    // A native event: jsdom has no onfocusout, so fireEvent.focusOut sends a "FocusOut" type that Preact never hears.
+    document.activeElement!.dispatchEvent(new FocusEvent("focusout", { bubbles: true, relatedTarget: null }));
+    await new Promise((r) => setTimeout(r));
+    expect(document.querySelector(".cluster-list")).not.toBeNull();
+
+    fireEvent.keyDown(document.activeElement!, { key: "Escape" });
+    await waitFor(() => expect(document.querySelector(".cluster-list")).toBeNull());
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(document.activeElement).toBe(toggle);
+    expect(localStorage.getItem("ccui.cluster")).toBe("c");
+
+    fireEvent.click(toggle);
+    await screen.findByRole("button", { name: "a" });
+    fireEvent.pointerDown(document.body);
+    await waitFor(() => expect(document.querySelector(".cluster-list")).toBeNull());
+    expect(localStorage.getItem("ccui.cluster")).toBe("c");
+
+    fireEvent.click(toggle);
+    const b = await screen.findByRole("button", { name: "b" });
+    b.focus();
+    // jsdom does not turn Enter on a button into a click as browsers do, so the click stands in for that activation.
+    fireEvent.keyDown(b, { key: "Enter" });
+    fireEvent.click(b);
+    expect(localStorage.getItem("ccui.cluster")).toBe("b");
+    await waitFor(() => expect(document.querySelector(".cluster-list")).toBeNull());
+    expect(document.activeElement).toBe(toggle);
+  });
+
+  it("marks an unreachable cluster in the list", async () => {
+    localStorage.clear();
+    setCluster("a");
+    mockFetch((c) => {
+      if (c.path === "/api/session") return { body: { authenticated: true, mode: "none", user: "anonymous", role: "admin", csrfToken: "t" } };
+      if (c.path === "/api/clusters") return { body: [{ name: "a" }, { name: "b" }] };
+      if (c.path === "/api/clusters/b/proxy/state") return { status: 502, body: { error: "x" } };
+      return { body: {} };
+    });
+    navigate("/load");
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Cluster a" }));
+    expect(await screen.findByRole("button", { name: "b (unreachable)" })).toBeTruthy();
+    expect(document.querySelector(".cluster-select .dot")).toBeTruthy();
   });
 
   const asRole = (role: "viewer" | "admin", mode = "local") => {
@@ -155,9 +233,13 @@ describe("App", () => {
       navigate("/summary");
       render(<App />);
       await waitFor(async () => expect(await hasReview()).toBe(false));
-      fireEvent.change(screen.getByLabelText("Cluster"), { target: { value: "b" } });
+      // scoped to the header: the Summary table has a button per cluster too
+      const header = within(screen.getByRole("banner"));
+      fireEvent.click(header.getByRole("button", { name: /Cluster/ }));
+      fireEvent.click(await header.findByRole("button", { name: "b" }));
       await waitFor(async () => expect(await hasReview()).toBe(true));
-      fireEvent.change(screen.getByLabelText("Cluster"), { target: { value: "a" } });
+      fireEvent.click(header.getByRole("button", { name: /Cluster/ }));
+      fireEvent.click(await header.findByRole("button", { name: "a" }));
       await waitFor(async () => expect(await hasReview()).toBe(false));
     });
 
