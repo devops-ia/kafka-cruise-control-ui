@@ -169,6 +169,26 @@ describe("read pages", () => {
     expect(screen.getByRole("button", { name: "b" })).toBeTruthy();
   });
 
+  it("Summary shows the Proposal column per cluster from the analyzer state, with one state call each", async () => {
+    clusters.set([{ name: "a" }, { name: "b" }, { name: "c" }]);
+    const calls = mockFetch((c) => {
+      if (c.path.startsWith("/api/clusters/b/")) return { status: 502, body: { error: "cluster unavailable" } };
+      if (c.path.endsWith("kafka_cluster_state")) return { body: clusterState };
+      return { body: c.path.startsWith("/api/clusters/c/") ? { ...ccState, AnalyzerState: { isProposalReady: false } } : ccState };
+    });
+    render(<Summary />);
+    const cell = async (name: string) => (await screen.findByRole("button", { name })).closest("tr")!;
+    expect(await within(await cell("a")).findByText("ready")).toBeTruthy();
+    expect(within(await cell("c")).getByText("not ready")).toBeTruthy();
+    const b = within(await cell("b")).getAllByRole("cell");
+    expect(b[6].textContent).toBe("-"); // Executor (the row header is not a cell)
+    expect(b[7].textContent).toBe("-"); // Proposal
+    expect(screen.getByRole("columnheader", { name: "Proposal" }).previousElementSibling?.textContent).toBe("Executor");
+    const st = calls.filter((c) => c.path.endsWith("/proxy/state"));
+    expect(st).toHaveLength(3);
+    expect(st.every((c) => c.query.get("substates") === "EXECUTOR,ANALYZER")).toBe(true);
+  });
+
   it("User tasks lists tasks", async () => {
     serve({ user_tasks: userTasks });
     render(<UserTasks />);
@@ -403,6 +423,84 @@ describe("result tables", () => {
     expect(within(t).queryByRole("row", { name: /orders/ })).toBeNull();
     expect(within(t).getByRole("row", { name: /payments/ })).toBeTruthy();
     expect(within(t).getByRole("button", { name: "Topic" })).toBeTruthy();
+  });
+
+  describe("Create reassignment.json", () => {
+    const open = async (body: unknown = optimizationVerbose) => {
+      await viewProposals(body);
+      document.querySelectorAll("details").forEach((d) => (d.open = true));
+      const t = screen.getByRole("region", { name: /Proposed partition movements/ });
+      const btn = within(t).getByRole("button", { name: "Create reassignment.json" });
+      btn.focus(); // a real click focuses the button; fireEvent does not
+      fireEvent.click(btn);
+      return t;
+    };
+    const shownJson = () => within(screen.getByRole("dialog")).getByText(/"version"/).textContent!;
+    const full = { version: 1, partitions: [{ topic: "orders", partition: 3, replicas: [0, 2] }, { topic: "payments", partition: 0, replicas: [2] }] };
+
+    it("shows the whole proposal as version 1 JSON with newReplicas", async () => {
+      await open();
+      expect(JSON.parse(shownJson())).toEqual(full);
+      expect(shownJson()).toBe(JSON.stringify(full, null, 2));
+    });
+
+    it("keeps only the rows left by the topic filter, from every page", async () => {
+      const many = Array.from({ length: 25 }, (_, i) => ({ topicPartition: { topic: i < 12 ? "orders" : "payments", partition: i }, oldReplicas: [0], newReplicas: [1] }));
+      const t = await open({ ...optimizationVerbose, proposals: many });
+      fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+      expect(JSON.parse((fireEvent.click(within(t).getByRole("button", { name: "Create reassignment.json" })), shownJson())).partitions).toHaveLength(25);
+      fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+      fireEvent.click(within(t).getByRole("button", { name: "Filter" }));
+      fireEvent.input(within(t).getByLabelText("Filter Topic"), { target: { value: "orders" } });
+      fireEvent.click(within(t).getByRole("button", { name: "Create reassignment.json" }));
+      expect(JSON.parse(shownJson()).partitions.map((p: any) => p.topic)).toEqual(Array(12).fill("orders"));
+    });
+
+    it("is an empty list when the filter leaves no rows", async () => {
+      const t = await open();
+      fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+      fireEvent.click(within(t).getByRole("button", { name: "Filter" }));
+      fireEvent.input(within(t).getByLabelText("Filter Topic"), { target: { value: "nope" } });
+      fireEvent.click(within(t).getByRole("button", { name: "Create reassignment.json" }));
+      expect(JSON.parse(shownJson())).toEqual({ version: 1, partitions: [] });
+    });
+
+    it("Copy writes the shown text to the clipboard", async () => {
+      const writeText = vi.fn(async () => {});
+      vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
+      await open();
+      fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+      expect(writeText).toHaveBeenCalledWith(shownJson());
+    });
+
+    it("Download saves reassignment.json with the shown text", async () => {
+      let blob: Blob | undefined;
+      URL.createObjectURL = vi.fn((b: Blob) => ((blob = b), "blob:x"));
+      URL.revokeObjectURL = vi.fn();
+      const names: string[] = [];
+      vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
+        names.push(this.download);
+      });
+      await open();
+      fireEvent.click(screen.getByRole("button", { name: "Download" }));
+      expect(names).toEqual(["reassignment.json"]);
+      expect(await blob!.text()).toBe(shownJson());
+    });
+
+    it("Escape closes it and focus returns to the button", async () => {
+      const t = await open();
+      const btn = within(t).getByRole("button", { name: "Create reassignment.json" });
+      fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(document.activeElement).toBe(btn);
+    });
+
+    it("Executor intra-broker tables do not have the button", async () => {
+      serve({ state: ccStateIntra });
+      render(<CCState />);
+      await screen.findByRole("region", { name: "In progress intra-broker movements (2)" });
+      expect(screen.queryByRole("button", { name: "Create reassignment.json" })).toBeNull();
+    });
   });
 
   it("Proposals shows the stats and Goal results side by side, and only the stats without goals", async () => {

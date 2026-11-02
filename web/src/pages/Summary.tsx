@@ -8,10 +8,11 @@ import { RefreshBar } from "../components/Async";
 
 function Row({ name, group }: { name: string; group?: string }) {
   const kcs = useResource("kafka_cluster_state", {}, name);
-  const st = useResource("state", { substates: "EXECUTOR" }, name);
+  const st = useResource("state", { substates: "EXECUTOR,ANALYZER" }, name);
   const s = kcs.data?.KafkaBrokerState?.Summary ?? {};
   const parts = kcs.data?.KafkaPartitionState ?? {};
   const bad = (parts.offline?.length ?? 0) + (parts.urp?.length ?? 0) + (parts["with-offline-replicas"]?.length ?? 0);
+  const ready = st.data?.AnalyzerState?.isProposalReady;
   const failed = kcs.error && !kcs.data;
   return (
     <tr>
@@ -36,6 +37,7 @@ function Row({ name, group }: { name: string; group?: string }) {
       <td class="num">{s.Replicas ?? "-"}</td>
       <td class="num">{s.Leaders ?? "-"}</td>
       <td>{st.data?.ExecutorState?.state ?? (st.error ? "-" : "...")}</td>
+      <td>{ready == null ? (st.error ? "-" : "...") : <span class={`badge ${ready ? "ok" : "bad"}`}>{ready ? "ready" : "not ready"}</span>}</td>
       <td class="muted">{failed ? kcs.error?.message : ""}</td>
     </tr>
   );
@@ -63,6 +65,7 @@ export function Summary() {
               <th scope="col" class="num">Replicas</th>
               <th scope="col" class="num">Leaders</th>
               <th scope="col">Executor</th>
+              <th scope="col">Proposal</th>
               <th scope="col">Detail</th>
             </tr>
           </thead>

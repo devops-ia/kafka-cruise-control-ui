@@ -22,7 +22,7 @@ export function sortRows<R>(rows: R[], col: Column<R> | undefined, dir: "asc" | 
   });
 }
 
-export function Table<R>(props: { caption: string; columns: Column<R>[]; rows: R[]; rowKey?: (r: R, i: number) => string | number; filterable?: boolean; pageable?: boolean }) {
+export function Table<R>(props: { caption: string; columns: Column<R>[]; rows: R[]; rowKey?: (r: R, i: number) => string | number; filterable?: boolean; pageable?: boolean; toolbar?: (shown: R[]) => ComponentChildren }) {
   const { columns, rows } = props;
   const [sort, setSort] = useState<{ col: string; dir: "asc" | "desc" } | undefined>();
   const [filters, setFilters] = useState<Record<string, string>>({});
@@ -66,6 +66,7 @@ export function Table<R>(props: { caption: string; columns: Column<R>[]; rows: R
                 Filter
               </button>
             )}
+            {props.toolbar?.(shown)}
           </div>
         </caption>
         <thead>
