@@ -6,6 +6,15 @@ import { setCluster } from "../store";
 import { RefreshBar } from "../components/Async";
 
 
+// Only mounted for a ready cluster, so a cluster without a proposal costs no extra call.
+function ProposalCell({ name }: { name: string }) {
+  const p = useResource("proposals", {}, name);
+  const sm = p.data?.summary;
+  if (!sm) return <span class={p.error ? undefined : "muted"}>{p.error ? "-" : "..."}</span>;
+  const moves = (sm.numReplicaMovements ?? 0) + (sm.numLeaderMovements ?? 0) + (sm.numIntraBrokerReplicaMovements ?? 0) > 0;
+  return <span class="badge ok">{moves ? "proposal" : "no changes"}</span>;
+}
+
 function Row({ name, group }: { name: string; group?: string }) {
   const kcs = useResource("kafka_cluster_state", {}, name);
   const st = useResource("state", { substates: "EXECUTOR,ANALYZER" }, name);
@@ -37,7 +46,7 @@ function Row({ name, group }: { name: string; group?: string }) {
       <td class="num">{s.Replicas ?? "-"}</td>
       <td class="num">{s.Leaders ?? "-"}</td>
       <td>{st.data?.ExecutorState?.state ?? (st.error ? "-" : "...")}</td>
-      <td>{ready == null ? (st.error ? "-" : "...") : <span class={`badge ${ready ? "ok" : "bad"}`}>{ready ? "ready" : "not ready"}</span>}</td>
+      <td>{ready == null ? (st.error ? "-" : "...") : ready ? <ProposalCell name={name} /> : <span class="badge bad">not ready</span>}</td>
       <td class="muted">{failed ? kcs.error?.message : ""}</td>
     </tr>
   );

@@ -18,7 +18,7 @@ In `local` mode the login asks for a user name and a password. A wrong password 
 
 ## Summary
 
-One row per cluster, for all clusters at once: group, health, brokers, topics, replicas, leaders, executor state and proposal. Health is "healthy", "N partitions at risk" (offline partitions, under-replicated partitions and partitions with offline replicas added together) or "unreachable", in which case the Detail column shows the error. The Proposal column shows `ready` or `not ready`, from the `isProposalReady` flag in Cruise Control's analyzer state, or `-` when the cluster cannot be read. `ready` means Cruise Control holds a cached proposal; it does not mean the proposal contains any movements. Click a cluster name to select it and open its Cluster state.
+One row per cluster, for all clusters at once: group, health, brokers, topics, replicas, leaders, executor state and proposal. Health is "healthy", "N partitions at risk" (offline partitions, under-replicated partitions and partitions with offline replicas added together) or "unreachable", in which case the Detail column shows the error. The Proposal column shows `proposal` when Cruise Control holds a cached proposal with at least one replica, leader or intra-broker movement, `no changes` when the cached proposal has none, `not ready` when no proposal is cached (the `isProposalReady` flag of the analyzer state), and `-` when the cluster or its proposal cannot be read. It reads `proposals` once for each ready cluster, which only admins may do, so a viewer sees `-` for ready clusters. Click a cluster name to select it and open its Cluster state.
 
 ![Summary](assets/screenshots/summary.png)
 

@@ -169,24 +169,46 @@ describe("read pages", () => {
     expect(screen.getByRole("button", { name: "b" })).toBeTruthy();
   });
 
-  it("Summary shows the Proposal column per cluster from the analyzer state, with one state call each", async () => {
-    clusters.set([{ name: "a" }, { name: "b" }, { name: "c" }]);
-    const calls = mockFetch((c) => {
-      if (c.path.startsWith("/api/clusters/b/")) return { status: 502, body: { error: "cluster unavailable" } };
-      if (c.path.endsWith("kafka_cluster_state")) return { body: clusterState };
-      return { body: c.path.startsWith("/api/clusters/c/") ? { ...ccState, AnalyzerState: { isProposalReady: false } } : ccState };
+  describe("Summary Proposal column", () => {
+    const sum = (r = 0, l = 0, i = 0) => ({ summary: { numReplicaMovements: r, numLeaderMovements: l, numIntraBrokerReplicaMovements: i } });
+    // a: replica moves, b: unreachable, c: not ready, d: empty, e: leader only, f: intra-broker only, g: proposals 403
+    const setup = () => {
+      clusters.set(["a", "b", "c", "d", "e", "f", "g"].map((name) => ({ name })));
+      const calls = mockFetch((c) => {
+        const cl = c.path.split("/")[3];
+        if (cl === "b") return { status: 502, body: { error: "cluster unavailable" } };
+        if (c.path.endsWith("kafka_cluster_state")) return { body: clusterState };
+        if (c.path.endsWith("/proxy/proposals")) {
+          if (cl === "g") return { status: 403, body: { error: "forbidden" } };
+          return { body: { a: sum(3), d: sum(), e: sum(0, 2), f: sum(0, 0, 1) }[cl] };
+        }
+        return { body: cl === "c" ? { ...ccState, AnalyzerState: { isProposalReady: false } } : ccState };
+      });
+      return calls;
+    };
+    const proposalCell = async (name: string) => (await screen.findByRole("button", { name })).closest("tr")!.querySelectorAll("td")[7];
+
+    it("shows proposal, no changes, not ready or - per cluster", async () => {
+      setup();
+      render(<Summary />);
+      await waitFor(async () => {
+        const t = async (n: string) => (await proposalCell(n)).textContent;
+        expect([await t("a"), await t("b"), await t("c"), await t("d"), await t("e"), await t("f"), await t("g")]).toEqual(["proposal", "-", "not ready", "no changes", "proposal", "proposal", "-"]);
+      });
+      expect(screen.queryByText("ready")).toBeNull();
+      expect(screen.getByRole("columnheader", { name: "Proposal" }).previousElementSibling?.textContent).toBe("Executor");
     });
-    render(<Summary />);
-    const cell = async (name: string) => (await screen.findByRole("button", { name })).closest("tr")!;
-    expect(await within(await cell("a")).findByText("ready")).toBeTruthy();
-    expect(within(await cell("c")).getByText("not ready")).toBeTruthy();
-    const b = within(await cell("b")).getAllByRole("cell");
-    expect(b[6].textContent).toBe("-"); // Executor (the row header is not a cell)
-    expect(b[7].textContent).toBe("-"); // Proposal
-    expect(screen.getByRole("columnheader", { name: "Proposal" }).previousElementSibling?.textContent).toBe("Executor");
-    const st = calls.filter((c) => c.path.endsWith("/proxy/state"));
-    expect(st).toHaveLength(3);
-    expect(st.every((c) => c.query.get("substates") === "EXECUTOR,ANALYZER")).toBe(true);
+
+    it("asks state for every cluster and proposals only for ready ones, without verbose", async () => {
+      const calls = setup();
+      render(<Summary />);
+      await waitFor(async () => expect((await proposalCell("g")).textContent).toBe("-"));
+      const st = calls.filter((c) => c.path.endsWith("/proxy/state"));
+      expect(st).toHaveLength(7);
+      const pr = calls.filter((c) => c.path.endsWith("/proxy/proposals"));
+      expect(pr.map((c) => c.path.split("/")[3]).sort()).toEqual(["a", "d", "e", "f", "g"]);
+      expect(pr.every((c) => c.query.get("verbose") === null)).toBe(true);
+    });
   });
 
   it("User tasks lists tasks", async () => {
