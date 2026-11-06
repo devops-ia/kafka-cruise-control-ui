@@ -11,7 +11,7 @@ import { Summary } from "./pages/Summary";
 import { UserTasks } from "./pages/UserTasks";
 import { clusters } from "./clusters";
 import { session } from "./session";
-import { setCluster } from "./store";
+import { cluster, setCluster } from "./store";
 import { mockFetch, proxyPath } from "./testutil";
 
 beforeEach(() => {
@@ -208,6 +208,89 @@ describe("read pages", () => {
       const pr = calls.filter((c) => c.path.endsWith("/proxy/proposals"));
       expect(pr.map((c) => c.path.split("/")[3]).sort()).toEqual(["a", "d", "e", "f", "g"]);
       expect(pr.every((c) => c.query.get("verbose") === null)).toBe(true);
+    });
+
+    it("shows no changes in grey and proposal in green", async () => {
+      setup();
+      render(<Summary />);
+      await waitFor(async () => expect((await proposalCell("d")).textContent).toBe("no changes"));
+      const none = (await proposalCell("d")).querySelector(".badge")!;
+      expect(none.classList.contains("ok")).toBe(false);
+      expect(none.classList.contains("muted-state")).toBe(true);
+      expect((await proposalCell("a")).querySelector(".badge")!.classList.contains("ok")).toBe(true);
+    });
+
+    it("proposal opens Proposals for that cluster and other states are not buttons", async () => {
+      setup();
+      render(<Summary />);
+      await waitFor(async () => expect((await proposalCell("g")).textContent).toBe("-"));
+      for (const n of ["b", "c", "d", "g"]) expect((await proposalCell(n)).querySelector("button")).toBeNull();
+      fireEvent.click(within(await proposalCell("e")).getByRole("button", { name: "proposal" }));
+      expect(cluster.get()).toBe("e");
+      expect(location.pathname).toBe("/proposals");
+    });
+
+    describe("filters", () => {
+      // a prod proposal, b prod no changes, c dev no changes, d no group with proposal
+      const grouped = () => {
+        clusters.set([{ name: "a", group: "prod" }, { name: "b", group: "prod" }, { name: "c", group: "dev" }, { name: "d" }]);
+        return mockFetch((c) => {
+          const cl = c.path.split("/")[3];
+          if (c.path.endsWith("kafka_cluster_state")) return { body: clusterState };
+          if (c.path.endsWith("/proxy/proposals")) return { body: { a: sum(3), b: sum(), c: sum(), d: sum(1) }[cl] };
+          return { body: ccState };
+        });
+      };
+      const rows = () => screen.queryAllByRole("rowheader").map((e) => e.textContent);
+      const settled = () => waitFor(() => expect(screen.getAllByRole("button", { name: "proposal" })).toHaveLength(2));
+
+      it("lists all rows and the distinct groups sorted", async () => {
+        grouped();
+        render(<Summary />);
+        await settled();
+        expect(rows()).toEqual(["a", "b", "c", "d"]);
+        const opts = within(screen.getByLabelText("Group")).getAllByRole("option").map((o) => o.textContent);
+        expect(opts).toEqual(["All", "dev", "prod"]);
+      });
+
+      it("filters by group", async () => {
+        grouped();
+        render(<Summary />);
+        await settled();
+        fireEvent.change(screen.getByLabelText("Group"), { target: { value: "prod" } });
+        expect(rows()).toEqual(["a", "b"]);
+      });
+
+      it("combines group and proposal filters", async () => {
+        grouped();
+        render(<Summary />);
+        await settled();
+        fireEvent.change(screen.getByLabelText("Group"), { target: { value: "prod" } });
+        fireEvent.change(screen.getByLabelText("Proposal"), { target: { value: "proposal" } });
+        await waitFor(() => expect(rows()).toEqual(["a"]));
+      });
+
+      it("says so when nothing matches", async () => {
+        grouped();
+        render(<Summary />);
+        await settled();
+        expect(screen.queryByText("No clusters match the filters")).toBeNull();
+        fireEvent.change(screen.getByLabelText("Group"), { target: { value: "dev" } });
+        fireEvent.change(screen.getByLabelText("Proposal"), { target: { value: "proposal" } });
+        expect(await screen.findByText("No clusters match the filters")).toBeTruthy();
+        expect(rows()).toEqual([]);
+      });
+
+      it("does not change the requests when filters change", async () => {
+        const calls = grouped();
+        render(<Summary />);
+        await settled();
+        const before = calls.length;
+        fireEvent.change(screen.getByLabelText("Proposal"), { target: { value: "proposal" } });
+        fireEvent.change(screen.getByLabelText("Group"), { target: { value: "dev" } });
+        fireEvent.change(screen.getByLabelText("Group"), { target: { value: "" } });
+        expect(calls).toHaveLength(before);
+      });
     });
   });
 

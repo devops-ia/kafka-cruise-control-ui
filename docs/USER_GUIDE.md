@@ -20,6 +20,8 @@ In `local` mode the login asks for a user name and a password. A wrong password 
 
 One row per cluster, for all clusters at once: group, health, brokers, topics, replicas, leaders, executor state and proposal. Health is "healthy", "N partitions at risk" (offline partitions, under-replicated partitions and partitions with offline replicas added together) or "unreachable", in which case the Detail column shows the error. The Proposal column shows `proposal` when Cruise Control holds a cached proposal with at least one replica, leader or intra-broker movement, `no changes` when the cached proposal has none, `not ready` when no proposal is cached (the `isProposalReady` flag of the analyzer state), and `-` when the cluster or its proposal cannot be read. It reads `proposals` once for each ready cluster, which only admins may do, so a viewer sees `-` for ready clusters. Click a cluster name to select it and open its Cluster state.
 
+`no changes` is grey, so only `proposal` stands out in green. The `proposal` badge is a button: it selects that cluster and opens its Proposals page. Two selectors above the table narrow the rows. Group lists the groups of your clusters; Proposal set to `proposal` hides every cluster that does not show `proposal` (including those still loading or failing). They combine, and changing them sends no new requests. When nothing matches, the table says "No clusters match the filters".
+
 ![Summary](assets/screenshots/summary.png)
 
 ## Cluster state

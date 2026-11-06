@@ -1066,3 +1066,18 @@ progress.bar::-moz-progress-bar {
     grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
   }
 }
+.badge.muted-state {
+  color: var(--muted);
+  background: var(--sunken);
+  border-color: var(--line);
+}
+button.badge {
+  font-family: inherit;
+  min-height: 0;
+  cursor: pointer;
+}
+.filters {
+  display: flex;
+  gap: var(--s4);
+  margin-bottom: var(--s3);
+}
