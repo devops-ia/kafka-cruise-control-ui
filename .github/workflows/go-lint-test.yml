@@ -23,6 +23,9 @@ jobs:
           go-version: "1.26"
           check-latest: true
 
+      - name: Create empty web/dist
+        run: mkdir -p web/dist && touch web/dist/.gitkeep
+
       - name: Vet
         run: go vet ./...
 
