@@ -56,5 +56,13 @@ export function OptimizationView({ data }: { data: any }) {
 }
 
 export function JsonView({ data }: { data: unknown }) {
-  return <pre class="json" tabIndex={0}>{typeof data === "string" ? data : JSON.stringify(data, null, 2)}</pre>;
+  const text = typeof data === "string" ? data : JSON.stringify(data, null, 2);
+  return (
+    <div class="json-wrap">
+      <button type="button" class="json-copy" onClick={() => navigator.clipboard?.writeText(text)}>
+        Copy
+      </button>
+      <pre class="json" tabIndex={0}>{text}</pre>
+    </div>
+  );
 }

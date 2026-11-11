@@ -559,6 +559,15 @@ tr.nested td {
   font: 12px/1.5 var(--mono);
   margin: 0;
 }
+/* Copy sits in the block's top-right corner, outside the scroll area so it stays put */
+.json-wrap {
+  position: relative;
+}
+.json-copy {
+  position: absolute;
+  top: var(--s2);
+  right: var(--s4);
+}
 /* Stat strip: one bordered row of cells separated by hairlines */
 .stats {
   display: grid;
@@ -746,6 +755,9 @@ details > summary {
   display: inline-flex;
   align-items: center;
   gap: var(--s2);
+}
+.meter-cell .num {
+  min-width: 6ch;
 }
 meter {
   width: 60px;

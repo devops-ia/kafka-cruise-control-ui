@@ -8,6 +8,7 @@ import { Load } from "./pages/Load";
 import { PartitionLoad } from "./pages/PartitionLoad";
 import { Proposals } from "./pages/Proposals";
 import { Summary } from "./pages/Summary";
+import { JsonView } from "./components/Results";
 import { UserTasks } from "./pages/UserTasks";
 import { clusters } from "./clusters";
 import { session } from "./session";
@@ -449,6 +450,29 @@ describe("CC state and goals", () => {
     cleanup();
     await open({ ...ccState, MonitorState: { state: "RUNNING", loadingProgressPct: 100 } }, "Monitor");
     expect(screen.queryByText("Loading progress")).toBeNull();
+  });
+
+  it("Copy on Executor All fields writes the block text to the clipboard", async () => {
+    const writeText = vi.fn(async () => {});
+    vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
+    await open(ccState);
+    const block = screen.getByText("All fields").closest("details")!;
+    block.open = true;
+    fireEvent.click(within(block).getByRole("button", { name: "Copy" }));
+    const shown = block.querySelector("pre")!.textContent!;
+    expect(writeText).toHaveBeenCalledWith(shown);
+    expect(shown).toBe(JSON.stringify(ccState.ExecutorState, null, 2));
+  });
+
+  it("JsonView copies a string as is and does not throw without a clipboard", () => {
+    const writeText = vi.fn(async () => {});
+    vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
+    render(<JsonView data={'{"a":1}'} />);
+    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+    expect(writeText).toHaveBeenCalledWith('{"a":1}');
+    vi.stubGlobal("navigator", { userAgent: navigator.userAgent });
+    expect(() => fireEvent.click(screen.getByRole("button", { name: "Copy" }))).not.toThrow();
+    expect(screen.getByText('{"a":1}')).toBeTruthy();
   });
 
   it("an unknown field or a missing section does not break the page", async () => {

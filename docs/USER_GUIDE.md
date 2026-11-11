@@ -37,7 +37,7 @@ The cluster's Kafka state as Cruise Control reports it, from top to bottom:
 
 ## Cruise Control state
 
-The first row shows the executor, the monitor, the analyzer (proposal ready or not) and the balancedness score. Four tabs hold the detail. Each also has an "All fields" section with the raw values Cruise Control returned.
+The first row shows the executor, the monitor, the analyzer (proposal ready or not) and the balancedness score. Four tabs hold the detail. Each also has an "All fields" section with the raw values Cruise Control returned. Its "Copy" button, like the one on every JSON block in the UI, puts the block's text on the clipboard (browsers allow this only on https or localhost; the text is selectable otherwise).
 
 **Executor.** Whether a rebalance is running. While one is, you see partition and leadership movements as finished of total with a progress bar, the amount of data moved, the task that triggered it and its reason. The tab also lists recently demoted and removed brokers. When Cruise Control reports intra-broker movements, one table per non-empty list follows (for example "In progress intra-broker movements (2)", "Pending intra-broker movements (1)") with topic, partition and broker. Entries in the pending list that are already IN_PROGRESS appear under In progress.
 

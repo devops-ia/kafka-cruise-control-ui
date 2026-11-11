@@ -33,6 +33,11 @@ describe("styles.css", () => {
     expect(rule).toMatch(/overflow-y:\s*auto;/);
   });
 
+  it("gives the meter number a fixed width so bars and values line up", () => {
+    expect(css.match(/\.meter-cell \.num \{([^}]*)\}/)?.[1]).toMatch(/min-width:\s*6ch;/);
+    expect(css.match(/\n\.num \{([^}]*)\}/)?.[1]).toMatch(/font-variant-numeric:\s*tabular-nums;/);
+  });
+
   it("uses system fonts only", () => {
     expect(css).not.toMatch(/@font-face|@import|url\(/);
   });
