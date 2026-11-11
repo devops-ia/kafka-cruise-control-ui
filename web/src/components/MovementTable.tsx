@@ -43,9 +43,6 @@ function ReassignmentButton({ text }: { text: string }) {
       {open && (
         <ResultDialog title="reassignment.json" onClose={() => setOpen(false)}>
           <div class="actions">
-            <button type="button" onClick={() => navigator.clipboard?.writeText(text)}>
-              Copy
-            </button>
             <button type="button" onClick={download}>
               Download
             </button>
