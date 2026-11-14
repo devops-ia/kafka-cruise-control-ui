@@ -8,7 +8,7 @@ on:
     branches: [main]
     paths:
       - docs/**
-      - mkdocs.yml
+      - zensical.toml
       - .github/workflows/github-pages.yml
       - .github/workflows/docs-pr-check.yml
 
@@ -27,8 +27,8 @@ jobs:
           cache: pip
           cache-dependency-path: docs/requirements.txt
 
-      - name: Install MkDocs
+      - name: Install Zensical
         run: pip install -r docs/requirements.txt
 
       - name: Build
-        run: mkdocs build --strict
+        run: zensical build --strict
