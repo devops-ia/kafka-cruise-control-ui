@@ -5,5 +5,5 @@ web/dist/*
 /server
 /coverage
 
-# mkdocs output
+# zensical output
 site/
