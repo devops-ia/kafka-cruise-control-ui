@@ -323,6 +323,8 @@ What the server checks on every Bearer request:
 
 Providers are tried in order, only those with an `API_AUDIENCE`. The first one that accepts the token decides. Any valid token of the issuer that carries the audience and a mapped role is accepted: there is no list of allowed client ids (`azp`).
 
+Use an audience of its own for service accounts. If `API_AUDIENCE` equals the UI `CLIENT_ID`, the ID tokens issued to people for the UI carry that audience too and would also pass as Bearer tokens.
+
 Differences from a session caller:
 
 - A request with `Authorization: Bearer ...` never falls back to the cookie. If the token is invalid the answer is 401, even when a valid cookie is also sent. Other schemes (`Basic ...`) are ignored and the cookie is used as usual.

@@ -47,6 +47,7 @@ The model, and what it does not protect against:
 - **Any valid token with a role.** Signature, issuer, expiry and audience are checked on every request, and the role must resolve. There is no list of allowed `azp` or client ids: every client of the realm that carries the audience and a mapped group gets in.
 - **The identity provider decides the role.** The role comes from the groups claim, so whoever edits group membership, or the group and audience mappers, in the realm controls who can run `demote_broker`. Treat that access like admin access to the UI.
 - **A stolen token is enough until it expires.** There is no session to revoke on the UI side. Keep the access token lifespan of service account clients short and protect the client secret.
+- **Use a distinct audience.** If `API_AUDIENCE` equals the UI `CLIENT_ID`, ID tokens issued to people for the UI also pass as Bearer tokens. Give service accounts an audience of their own.
 - **`DEFAULT_ROLE` widens it.** With a default role on a provider that has `API_AUDIENCE`, any token with that audience gets the role without a group. Leave it empty there.
 - **The rest is unchanged.** POST needs `admin`, `dryrun` stays mandatory, the audit log records the service account name and role, and the token is never written to a log.
 
