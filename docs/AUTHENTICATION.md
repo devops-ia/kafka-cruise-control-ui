@@ -318,7 +318,7 @@ What the server checks on every Bearer request:
 | Signature | Against the keys of the provider's issuer, found by discovery (`<issuer>/.well-known/openid-configuration`). The token must be a JWT. |
 | Issuer | The `iss` claim must equal `CCUI_OIDC__<n>__ISSUER` exactly. |
 | Expiry | The token must not be expired. |
-| Audience | The `aud` claim must contain `CCUI_OIDC__<n>__API_AUDIENCE`. A Keycloak token with `aud=account` does not pass. |
+| Audience | The `aud` claim must contain `CCUI_OIDC__<n>__API_AUDIENCE`. A Keycloak service account token without an audience mapper has no `aud` at all (or only `account`, if the account has realm roles) and does not pass. |
 | Role | The groups claim (`GROUPS_CLAIM`) is mapped with `ADMIN_GROUPS`, `VIEWER_GROUPS` and `DEFAULT_ROLE`, the same as for people. No role means 403. |
 
 Providers are tried in order, only those with an `API_AUDIENCE`. The first one that accepts the token decides. Any valid token of the issuer that carries the audience and a mapped role is accepted: there is no list of allowed client ids (`azp`).
@@ -388,8 +388,8 @@ curl -si -X POST -H "Authorization: Bearer $TOKEN" \
 | Status and body | Cause | What to check |
 | --- | --- | --- |
 | 401 `authentication required` | The token did not verify with any provider that has an `API_AUDIENCE`, or no provider has one. | Decode the payload of the token (the middle part, base64url, for example `cut -d. -f2 \| base64 -d`) in a terminal on your own machine. Compare `iss` with `ISSUER`, `aud` with `API_AUDIENCE` and `exp` with the clock. Do not paste a live token into a website. |
-| 401 and `iss` differs only in the host | The caller asked for the token through another address than the one in `ISSUER`, for example an internal service name. | Request the token from the same URL that `ISSUER` has, or set `ISSUER` to the address the tokens carry. |
-| 401 and `aud` is `account` | No audience mapper on the client, or it is not added to the access token. | Step 2 of the Keycloak setup. |
+| 401 and `iss` differs only in the host | The caller asked for the token through another address than the one in `ISSUER`, for example an internal service name. | Request the token from the same URL that `ISSUER` has, or set `ISSUER` to the address the tokens carry. In Keycloak, set the hostname (`KC_HOSTNAME`, a full URL such as `https://keycloak.example.com`) so `iss` is the same whatever address the caller used. |
+| 401 and `aud` is missing or `account` | No audience mapper on the client, or it is not added to the access token. | Step 2 of the Keycloak setup. |
 | 401 with a token that worked before | Expired. Keycloak service account tokens last five minutes by default. | Ask for a new one before each run, or raise the access token lifespan of the client above the longest wait. |
 | 401 and the log shows `oidc discovery failed` | The UI cannot reach the issuer. | Network and DNS from the UI to the identity provider. |
 | 403 `this account has no role in this application` | The token is valid but its groups claim has no group in `ADMIN_GROUPS` or `VIEWER_GROUPS`, and there is no `DEFAULT_ROLE`. | The group mapper, the group of the service account, and "Full group path" (with it on the value is `/ccui-admins`). |
@@ -444,6 +444,39 @@ CCUI_CLUSTERS__0__URL=http://cc.kafka.svc:9090/kafkacruisecontrol
 ```
 
 The token URL for the caller is `<ISSUER>/protocol/openid-connect/token`. The `preferred_username` of the token is `service-account-ansible-demote`, and that is the name in the audit log.
+
+**The same setup as a realm import.** To create it from code instead of the console, put this in a realm file and start Keycloak with `--import-realm` (the file goes in `/opt/keycloak/data/import`). It makes the client, the audience and groups mappers, the group, and the service account user inside it. Replace the client secret with a value from your secret store. This form was run against Keycloak 26.0 with the UI variables above.
+
+```json
+{
+  "realm": "ops",
+  "enabled": true,
+  "groups": [{ "name": "ccui-admins" }],
+  "clients": [{
+    "clientId": "ansible-demote",
+    "enabled": true,
+    "publicClient": false,
+    "secret": "replace-me",
+    "serviceAccountsEnabled": true,
+    "standardFlowEnabled": false,
+    "directAccessGrantsEnabled": false,
+    "protocolMappers": [
+      { "name": "ccui-api-audience", "protocol": "openid-connect", "protocolMapper": "oidc-audience-mapper",
+        "config": { "included.custom.audience": "ccui-api", "access.token.claim": "true", "id.token.claim": "false" } },
+      { "name": "groups", "protocol": "openid-connect", "protocolMapper": "oidc-group-membership-mapper",
+        "config": { "claim.name": "groups", "full.path": "false", "access.token.claim": "true", "id.token.claim": "false" } }
+    ]
+  }],
+  "users": [{
+    "username": "service-account-ansible-demote",
+    "enabled": true,
+    "serviceAccountClientId": "ansible-demote",
+    "groups": ["ccui-admins"]
+  }]
+}
+```
+
+Run Keycloak with `KC_HOSTNAME` set to its public URL. The token then always carries the same `iss`, which must equal `CCUI_OIDC__<n>__ISSUER`.
 
 #### Ansible: demote a broker and wait for it to finish
 
