@@ -42,6 +42,7 @@ type OIDCProvider struct {
 	GroupsClaim                                       string
 	AdminGroups, ViewerGroups                         []string
 	DefaultRole                                       string // "" denies users without a mapped group
+	APIAudience                                       string // "" keeps Bearer access off for this provider
 }
 
 // LocalUser is a user of CCUI_AUTH_MODE=local. Role is "viewer" or "admin".
@@ -354,7 +355,7 @@ func (l *loader) provider(i int, publicURL string) OIDCProvider {
 	ois := func(f string) string { return l.secret(p + f) }
 	o := OIDCProvider{
 		Name: oi("NAME"), Issuer: oi("ISSUER"), ClientID: oi("CLIENT_ID"), ClientSecret: ois("CLIENT_SECRET"),
-		GroupsClaim: orDefault(oi("GROUPS_CLAIM"), "groups"), DefaultRole: oi("DEFAULT_ROLE"),
+		GroupsClaim: orDefault(oi("GROUPS_CLAIM"), "groups"), DefaultRole: oi("DEFAULT_ROLE"), APIAudience: oi("API_AUDIENCE"),
 		AdminGroups: split(oi("ADMIN_GROUPS")), ViewerGroups: split(oi("VIEWER_GROUPS")),
 		Scopes: split(strings.ReplaceAll(orDefault(oi("SCOPES"), "openid profile email"), " ", ",")),
 	}

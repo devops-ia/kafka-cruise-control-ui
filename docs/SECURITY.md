@@ -37,6 +37,20 @@ Cookies would let another site make a signed-in browser send requests, so every 
 
 A failure answers 403 `missing or invalid CSRF token or Origin`. The login has no session and so no token yet. It requires a valid `Origin` only (403 `invalid Origin`). The session cookie is also `SameSite=Lax`.
 
+### Bearer tokens and service accounts
+
+A request with `Authorization: Bearer <access token>` is exempt from the CSRF token and `Origin` checks, because a browser never attaches that header by itself. This only exists when a provider sets `CCUI_OIDC__<n>__API_AUDIENCE`. How to set it up is in [Authentication](AUTHENTICATION.md#service-account-access-bearer-token).
+
+The model, and what it does not protect against:
+
+- **No ambient credentials.** The token travels only where the caller puts it. A malicious page cannot make a browser send it, so CSRF does not apply. A request that has only a cookie keeps both checks.
+- **Any valid token with a role.** Signature, issuer, expiry and audience are checked on every request, and the role must resolve. There is no list of allowed `azp` or client ids: every client of the realm that carries the audience and a mapped group gets in.
+- **The identity provider decides the role.** The role comes from the groups claim, so whoever edits group membership, or the group and audience mappers, in the realm controls who can run `demote_broker`. Treat that access like admin access to the UI.
+- **A stolen token is enough until it expires.** There is no session to revoke on the UI side. Keep the access token lifespan of service account clients short and protect the client secret.
+- **Use a distinct audience.** If `API_AUDIENCE` equals the UI `CLIENT_ID`, ID tokens issued to people for the UI also pass as Bearer tokens. Give service accounts an audience of their own.
+- **`DEFAULT_ROLE` widens it.** With a default role on a provider that has `API_AUDIENCE`, any token with that audience gets the role without a group. Leave it empty there.
+- **The rest is unchanged.** POST needs `admin`, `dryrun` stays mandatory, the audit log records the service account name and role, and the token is never written to a log.
+
 ## Login rate limit
 
 Failed local logins are counted under two keys, the client address and the lowercased user name. Once either key reaches `CCUI_LOGIN_MAX_ATTEMPTS` failures inside `CCUI_LOGIN_WINDOW`, the login answers 429 with a `Retry-After` header until the window, counted from the first failure, ends. The right password does not get through while blocked. A successful login resets the user-name key only.

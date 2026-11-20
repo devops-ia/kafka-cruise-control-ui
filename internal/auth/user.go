@@ -2,7 +2,7 @@ package auth
 
 import "context"
 
-// User is the authenticated caller. Token is the OIDC id_token, kept only to forward the identity to Cruise Control.
+// User is the authenticated caller. Token is the OIDC id_token (the access token for Bearer callers), kept only to forward the identity to Cruise Control.
 type User struct {
 	Name  string
 	Role  Role

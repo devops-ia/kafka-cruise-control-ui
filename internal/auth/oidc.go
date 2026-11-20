@@ -29,6 +29,7 @@ type flow struct {
 type oidcClient struct {
 	oauth    *oauth2.Config
 	verifier *oidc.IDTokenVerifier
+	api      *oidc.IDTokenVerifier // access tokens of service accounts; nil unless API_AUDIENCE is set
 }
 
 type oidcState struct {
@@ -69,8 +70,54 @@ func (m *Manager) client(ctx context.Context, p config.OIDCProvider) (*oidcClien
 		},
 		verifier: prov.Verifier(&oidc.Config{ClientID: p.ClientID}),
 	}
+	if p.APIAudience != "" {
+		c.api = prov.Verifier(&oidc.Config{ClientID: p.APIAudience})
+	}
 	m.oidc.clients[p.Name] = c
 	return c, nil
+}
+
+// apiEnabled reports whether any provider accepts Bearer access tokens.
+func (m *Manager) apiEnabled() bool {
+	return m.cfg.AuthMode == "oidc" && slices.ContainsFunc(m.cfg.OIDC, func(p config.OIDCProvider) bool { return p.APIAudience != "" })
+}
+
+// bearer verifies an access token against every provider with an API audience; the first that accepts it decides.
+// The token never reaches a log line.
+func (m *Manager) bearer(ctx context.Context, raw string) (u User, status int, msg string) {
+	for _, p := range m.cfg.OIDC {
+		if p.APIAudience == "" {
+			continue
+		}
+		c, err := m.client(ctx, p)
+		if err != nil {
+			m.log.Warn("oidc discovery failed", "provider", p.Name, "err", err)
+			continue
+		}
+		idt, err := c.api.Verify(ctx, raw)
+		if err != nil {
+			continue
+		}
+		var claims map[string]any
+		if idt.Claims(&claims) != nil {
+			continue
+		}
+		name := firstString(claims, "preferred_username", "email", "name", "sub")
+		role := RoleFromClaims(p, claims)
+		if role == 0 {
+			m.log.Warn("bearer caller has no mapped role", "provider", p.Name, "user", name)
+			return User{}, http.StatusForbidden, "this account has no role in this application"
+		}
+		for _, l := range m.cfg.LocalUsers {
+			if l.Name == name {
+				m.log.Warn("audit", "event", "bearer_refused", "reason", "name collides with a local user", "provider", p.Name, "user", name)
+				return User{}, http.StatusForbidden, "this user name belongs to a local user"
+			}
+		}
+		return User{Name: name, Role: role, Token: raw}, 0, ""
+	}
+	m.log.Warn("bearer token rejected")
+	return User{}, http.StatusUnauthorized, "authentication required"
 }
 
 func (m *Manager) oidcLogin(w http.ResponseWriter, r *http.Request) {

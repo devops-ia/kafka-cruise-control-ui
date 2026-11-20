@@ -83,3 +83,40 @@ func TestForwardIdentity(t *testing.T) {
 		t.Errorf("jwt without token: %d", status)
 	}
 }
+
+// A service account caller (Bearer) is just a User with the access token as Token.
+func TestForwardIdentityForServiceAccount(t *testing.T) {
+	svc := config.ClusterAuth{Type: "basic", User: "svc", Password: "pw"}
+	sa := auth.User{Name: "service-account-ansible", Role: auth.Admin, Token: "sa-access"}
+
+	if h, q, _ := seenAuth(t, svc, "jwt", sa); h.Get("Authorization") != "Bearer sa-access" || q.Has("doAs") {
+		t.Errorf("jwt: auth=%q", h.Get("Authorization"))
+	}
+	if h, q, _ := seenAuth(t, svc, "doas", sa); q.Get("doAs") != "service-account-ansible" || h.Get("Authorization") != "Basic c3ZjOnB3" {
+		t.Errorf("doas: doAs=%q auth=%q", q.Get("doAs"), h.Get("Authorization"))
+	}
+	if h, q, _ := seenAuth(t, svc, "", sa); q.Has("doAs") || h.Get("Authorization") != "Basic c3ZjOnB3" {
+		t.Errorf("no forwarding: doAs=%q auth=%q", q.Get("doAs"), h.Get("Authorization"))
+	}
+}
+
+func TestServiceAccountKeepsRoleGateAndDryRun(t *testing.T) {
+	for _, c := range []struct {
+		role auth.Role
+		path string
+		want int
+	}{
+		{auth.Viewer, "demote_broker?dryrun=false&brokerid=1", 403},
+		{auth.Admin, "demote_broker?brokerid=1", 400},
+		{auth.Admin, "demote_broker?dryrun=maybe&brokerid=1", 400},
+		{auth.Admin, "demote_broker?dryrun=false&brokerid=1", 200},
+	} {
+		f := newFixture(t, c.role, 5e9, ok)
+		if got := do(t, "POST", f.ui.URL+"/api/clusters/a/proxy/"+c.path, nil).StatusCode; got != c.want {
+			t.Errorf("%v %s: %d, want %d", c.role, c.path, got, c.want)
+		}
+		if (c.want != 200) != (f.hits.Load() == 0) {
+			t.Errorf("%v %s: CC hits %d", c.role, c.path, f.hits.Load())
+		}
+	}
+}

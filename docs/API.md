@@ -31,8 +31,29 @@ Any other path under `/api/` answers 401 without a session and 404 `not found` w
 | `Cookie: ccui_session=...` | Every `/api/` call except the ones marked none above. |
 | `X-CSRF-Token` | Every request that is not GET, HEAD or OPTIONS, on routes that have a session. The value is `csrfToken` from `/api/session`. |
 | `Origin` | The same requests, and `/api/login`. Must equal `CCUI_PUBLIC_URL`, or the request's `Host` when that is unset. Browsers add it by themselves; curl does not. |
+| `Authorization: Bearer <access token>` | Instead of the cookie, for service accounts, when a provider has `API_AUDIENCE`. See below. |
 | `User-Task-ID` | Optional on the proxy route, to continue an asynchronous Cruise Control task. |
 | `Accept: application/json` | Recommended. Forwarded to Cruise Control. |
+
+### Bearer access for service accounts
+
+In `oidc` mode, when at least one provider sets `CCUI_OIDC__<n>__API_AUDIENCE`, every `/api/` route that needs a session also accepts `Authorization: Bearer <access token>`, the JWT a service account gets from the identity provider's `client_credentials` grant. Setup is in [Authentication](AUTHENTICATION.md#service-account-access-bearer-token).
+
+- No `X-CSRF-Token` and no `Origin` are required with a Bearer token. With only a cookie, both still are.
+- No cookie is set and no session is created. Each request is verified again.
+- A Bearer header decides alone: an invalid token is 401 even with a valid cookie. Other schemes are ignored.
+- Role gate, `dryrun` rules and the answers of the proxy route are the same as for a session.
+
+| Status | Body or cause |
+| --- | --- |
+| 401 `authentication required` | The token is not a valid JWT for any provider with an `API_AUDIENCE`: signature, issuer, expiry or audience. Also when no provider has one. |
+| 403 `this account has no role in this application` | Valid token, but no group in `ADMIN_GROUPS` or `VIEWER_GROUPS` and no `DEFAULT_ROLE`. |
+| 403 `this user name belongs to a local user` | The name in the token equals a configured local user. |
+
+```sh
+curl -s -X POST -H "Authorization: Bearer $TOKEN" \
+  "https://cc.example.com/api/clusters/prod/proxy/demote_broker?dryrun=true&brokerid=1"
+```
 
 ## GET /api/session
 

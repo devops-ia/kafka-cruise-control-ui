@@ -105,6 +105,7 @@ One or more providers, numbered from 0. Any OpenID Connect provider that publish
 | `CCUI_OIDC__<n>__ADMIN_GROUPS` | no | none | `ccui-admins,platform` |
 | `CCUI_OIDC__<n>__VIEWER_GROUPS` | no | none | `developers` |
 | `CCUI_OIDC__<n>__DEFAULT_ROLE` | no | none (access denied) | `viewer` |
+| `CCUI_OIDC__<n>__API_AUDIENCE` | no | none (Bearer access off) | `ccui-api` |
 
 Every secret above also accepts the `_FILE` form, for example `CCUI_SESSION_SECRET_FILE`, `CCUI_LOCAL_ADMIN_PASSWORD_HASH_FILE`, `CCUI_LOCAL_USERS__0__PASSWORD_HASH_FILE`, `CCUI_CLUSTERS__0__AUTH_PASSWORD_FILE`, `CCUI_CLUSTERS__0__AUTH_TOKEN_FILE`, `CCUI_CLUSTERS__0__AUTH_OIDC_CLIENT_SECRET_FILE` and `CCUI_OIDC__0__CLIENT_SECRET_FILE`.
 
