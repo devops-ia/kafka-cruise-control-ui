@@ -173,3 +173,18 @@ func TestOIDCModeProvider(t *testing.T) {
 		t.Fatalf("%+v", p)
 	}
 }
+
+func TestOIDCAPIAudience(t *testing.T) {
+	base := []string{"CCUI_AUTH_MODE", "oidc", "CCUI_SESSION_SECRET", strings.Repeat("s", 32), "CCUI_PUBLIC_URL", "https://ui.example",
+		"CCUI_CLUSTERS__0__NAME", "a", "CCUI_CLUSTERS__0__URL", "http://x",
+		"CCUI_OIDC__0__NAME", "corp", "CCUI_OIDC__0__ISSUER", "https://idp", "CCUI_OIDC__0__CLIENT_ID", "id", "CCUI_OIDC__0__CLIENT_SECRET", "sec"}
+	for want, extra := range map[string][]string{"": nil, "ccui-api": {"CCUI_OIDC__0__API_AUDIENCE", "ccui-api"}} {
+		c, err := Load(env(append(base, extra...)...))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := c.OIDC[0].APIAudience; got != want {
+			t.Errorf("APIAudience = %q, want %q", got, want)
+		}
+	}
+}

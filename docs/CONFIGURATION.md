@@ -124,6 +124,7 @@ Used with `CCUI_AUTH_MODE=oidc`, which also needs `CCUI_PUBLIC_URL` and `CCUI_SE
 | `CCUI_OIDC__<n>__ADMIN_GROUPS` | none | Groups that get the `admin` role. |
 | `CCUI_OIDC__<n>__VIEWER_GROUPS` | none | Groups that get the `viewer` role. |
 | `CCUI_OIDC__<n>__DEFAULT_ROLE` | none | `viewer` or `admin` for users who match no group. Without it they are refused. |
+| `CCUI_OIDC__<n>__API_AUDIENCE` | none | Audience (`aud`) an access token must carry to enter `/api/*` with `Authorization: Bearer`. Without a value on any provider, Bearer access is off. Not a secret. See [Service account access](AUTHENTICATION.md#service-account-access-bearer-token). |
 
 ## Complete examples
 

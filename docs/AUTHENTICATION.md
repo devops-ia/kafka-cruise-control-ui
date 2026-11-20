@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | `none` | Nobody signs in. Every visitor is the user `anonymous`. | Always `admin`. |
 | `local` | Users defined in environment variables, checked against a password hash. | `CCUI_LOCAL_USERS__<n>__ROLE`, or `admin` for the `CCUI_LOCAL_ADMIN_*` shortcut. |
-| `oidc` | Users of one or more OpenID Connect providers. | The groups claim of the ID token. |
+| `oidc` | Users of one or more OpenID Connect providers. Optionally also service accounts with a Bearer token, see [Service account access](#service-account-access-bearer-token). | The groups claim of the ID token (of the access token for service accounts). |
 
 In `none` mode the server logs a warning at start. The CSRF and `Origin` checks still apply to every POST.
 
@@ -304,6 +304,232 @@ CCUI_CLUSTERS__0__URL=http://cc.kafka.svc:9090/kafkacruisecontrol
 ```
 
 A Keycloak realm with GitHub as an identity provider does the same job.
+
+## Service account access (Bearer token)
+
+Scripts and playbooks cannot go through the browser login. With `CCUI_AUTH_MODE=oidc` they can call `/api/*` with `Authorization: Bearer <access token>`, using a token the identity provider issues to a service account (the OAuth2 `client_credentials` grant). No session is created: every request is verified again.
+
+This is off unless at least one provider has `CCUI_OIDC__<n>__API_AUDIENCE`. In any other mode, or without that variable, the `Authorization` header is ignored and everything behaves as before. Local users and browser sessions are not affected.
+
+What the server checks on every Bearer request:
+
+| Check | Detail |
+| --- | --- |
+| Signature | Against the keys of the provider's issuer, found by discovery (`<issuer>/.well-known/openid-configuration`). The token must be a JWT. |
+| Issuer | The `iss` claim must equal `CCUI_OIDC__<n>__ISSUER` exactly. |
+| Expiry | The token must not be expired. |
+| Audience | The `aud` claim must contain `CCUI_OIDC__<n>__API_AUDIENCE`. A Keycloak token with `aud=account` does not pass. |
+| Role | The groups claim (`GROUPS_CLAIM`) is mapped with `ADMIN_GROUPS`, `VIEWER_GROUPS` and `DEFAULT_ROLE`, the same as for people. No role means 403. |
+
+Providers are tried in order, only those with an `API_AUDIENCE`. The first one that accepts the token decides. Any valid token of the issuer that carries the audience and a mapped role is accepted: there is no list of allowed client ids (`azp`).
+
+Differences from a session caller:
+
+- A request with `Authorization: Bearer ...` never falls back to the cookie. If the token is invalid the answer is 401, even when a valid cookie is also sent. Other schemes (`Basic ...`) are ignored and the cookie is used as usual.
+- No `X-CSRF-Token` and no `Origin` are needed. There are no ambient credentials to abuse, so those checks do not apply. A request with only a cookie still needs both.
+- The role gate does not change. A viewer cannot POST, and `dryrun` stays mandatory on the endpoints that have it.
+- The name in the audit log is the first non-empty of `preferred_username`, `email`, `name` and `sub`, as for people. Keycloak names service accounts `service-account-<client id>`. A name equal to a local user is refused with 403 and an audit line, like in [the user name](#the-user-name).
+- `GET /api/session` and `POST /api/logout` are for browser sessions and do not apply.
+
+With `AUTH_FORWARD_IDENTITY` on a cluster ([Clusters](CLUSTERS.md#forwarding-the-user-identity)): `jwt` forwards the access token the caller presented, and `doas` sends `doAs=<service account name>`. Without it, Cruise Control only sees the cluster's own service credentials. The caller's `Authorization` header never reaches Cruise Control in any other case.
+
+### Setting it up, step by step
+
+The order matters because each step needs something from the one before.
+
+1. **Identity provider.** Create a client for the caller with the `client_credentials` grant. Add an audience to its access tokens (the value you will use as `API_AUDIENCE`) and a groups claim. Put the service account in the group that maps to the role you want. The Keycloak steps are [below](#keycloak-as-the-identity-provider-for-service-accounts).
+2. **UI.** Set `CCUI_OIDC__<n>__API_AUDIENCE` on the provider, next to the variables of the human login (table below). The provider needs a valid `ISSUER` and the group lists.
+3. **Restart the UI.** Variables are read at start.
+4. **Check by hand with curl** ([below](#checking-with-curl)), first a read, then a dry run.
+5. **Use it** from the playbook or script.
+
+The variables on the UI side, for one provider that serves both people and service accounts:
+
+| Variable | Needed for Bearer | Meaning here |
+| --- | --- | --- |
+| `CCUI_AUTH_MODE=oidc` | yes | Bearer access only exists in `oidc` mode. |
+| `CCUI_OIDC__<n>__ISSUER` | yes | Must be the `iss` of the access tokens, character for character. |
+| `CCUI_OIDC__<n>__API_AUDIENCE` | yes | Turns Bearer on for this provider. Not a secret. |
+| `CCUI_OIDC__<n>__GROUPS_CLAIM` | if not `groups` | Name of the claim with the groups in the access token. |
+| `CCUI_OIDC__<n>__ADMIN_GROUPS`, `VIEWER_GROUPS` | yes, unless `DEFAULT_ROLE` | Which group of the service account gives which role. |
+| `CCUI_OIDC__<n>__DEFAULT_ROLE` | no | See the warning below. |
+| `CCUI_OIDC__<n>__CLIENT_ID`, `CLIENT_SECRET` | required by the provider block | Used by the browser login. Bearer does not use them. |
+
+!!! warning
+    Leave `DEFAULT_ROLE` empty on a provider that has `API_AUDIENCE`. With it set, any token that passes signature, issuer and audience gets that role even without a group. A service account does not log in by hand, so nobody notices it is there: a client added to the realm later, with the audience scope by mistake, would get access. Without `DEFAULT_ROLE`, a token without a mapped group is a 403, and the group is the only thing that grants access.
+
+The role comes from the group the identity provider puts in the token, so whoever can edit group membership or mappers in the realm decides who can run `demote_broker`. A stolen token works until it expires and nothing else is needed to use it, so keep the token lifespan short and the client secret out of the repository. More in [Security](SECURITY.md#bearer-tokens-and-service-accounts).
+
+### Checking with curl
+
+```sh
+TOKEN_URL='https://keycloak.example.com/realms/ops/protocol/openid-connect/token'
+UI='https://cc.example.com'
+
+TOKEN=$(curl -s -d grant_type=client_credentials \
+  -d client_id=ansible-demote -d client_secret="$CLIENT_SECRET" \
+  "$TOKEN_URL" | python3 -c 'import sys,json; print(json.load(sys.stdin)["access_token"])')
+
+# A read, allowed for viewers and admins
+curl -si -H "Authorization: Bearer $TOKEN" \
+  "$UI/api/clusters/prod/proxy/state?substates=EXECUTOR"
+
+# A dry run, admin only. No cookie, no CSRF token, no Origin.
+curl -si -X POST -H "Authorization: Bearer $TOKEN" \
+  "$UI/api/clusters/prod/proxy/demote_broker?dryrun=true&brokerid=1"
+```
+
+`CLIENT_SECRET` is a shell variable you set from your secret store. Do not write it in a file of the repository. A `200` or `202` from the dry run means the token, the group and the role gate all work.
+
+### Errors and how to read them
+
+| Status and body | Cause | What to check |
+| --- | --- | --- |
+| 401 `authentication required` | The token did not verify with any provider that has an `API_AUDIENCE`, or no provider has one. | Decode the payload of the token (the middle part, base64url, for example `cut -d. -f2 \| base64 -d`) in a terminal on your own machine. Compare `iss` with `ISSUER`, `aud` with `API_AUDIENCE` and `exp` with the clock. Do not paste a live token into a website. |
+| 401 and `iss` differs only in the host | The caller asked for the token through another address than the one in `ISSUER`, for example an internal service name. | Request the token from the same URL that `ISSUER` has, or set `ISSUER` to the address the tokens carry. |
+| 401 and `aud` is `account` | No audience mapper on the client, or it is not added to the access token. | Step 2 of the Keycloak setup. |
+| 401 with a token that worked before | Expired. Keycloak service account tokens last five minutes by default. | Ask for a new one before each run, or raise the access token lifespan of the client above the longest wait. |
+| 401 and the log shows `oidc discovery failed` | The UI cannot reach the issuer. | Network and DNS from the UI to the identity provider. |
+| 403 `this account has no role in this application` | The token is valid but its groups claim has no group in `ADMIN_GROUPS` or `VIEWER_GROUPS`, and there is no `DEFAULT_ROLE`. | The group mapper, the group of the service account, and "Full group path" (with it on the value is `/ccui-admins`). |
+| 403 `this user name belongs to a local user` | The name in the token equals a local user. | Rename the local user or the client. |
+| 403 `your role does not allow this operation` | The role is `viewer` and the call is a POST or an admin-only endpoint. | The group the service account is in. |
+| 400 `parameter "dryrun" is required (true or false)` | A POST without `dryrun`. This is not relaxed for Bearer callers. | Add `dryrun=true` or `dryrun=false`. |
+| 502 `cluster rejected the service credentials` | Cruise Control answered 401. It is not a problem of the Bearer token the UI accepted. | The cluster's `AUTH_*` settings, or with `jwt` forwarding, that Cruise Control accepts this access token. |
+
+The server log has a `bearer token rejected` warning for a 401, a `bearer caller has no mapped role` warning with the provider and name for a 403, and the `audit` line for the local-user collision. None of them contains the token.
+
+### Keycloak as the identity provider for service accounts
+
+This creates a client called `ansible-demote` that may run admin operations through the UI. Use the names that fit your realm. The realm `ops`, the audience `ccui-api`, the group `ccui-admins` and the host names are examples.
+
+**1. Create the client.** In the realm, go to Clients, Create client.
+
+- Client type: OpenID Connect. Client ID: `ansible-demote`.
+- Client authentication: On. Authentication flow: tick only "Service accounts roles" (this is "Service Accounts Enabled", the `client_credentials` grant). Untick "Standard flow" and "Direct access grants".
+- Save. In the Credentials tab, copy the client secret to your secret store. It is not written anywhere in this guide.
+
+**2. Add the audience.** Clients, `ansible-demote`, Client scopes tab, `ansible-demote-dedicated`, Configure a new mapper, "Audience".
+
+- Name: `ccui-api-audience`.
+- Included Custom Audience: `ccui-api`. There does not need to be a client with that id; any string works if it equals `API_AUDIENCE`.
+- Add to access token: On.
+
+**3. Add the groups claim.** In the same dedicated scope, Configure a new mapper, "Group Membership".
+
+- Name: `groups`. Token Claim Name: `groups`.
+- Full group path: Off, so the values are `ccui-admins` and not `/ccui-admins`.
+- Add to access token: On.
+
+**4. Create the group and put the service account in it.** Groups, Create group `ccui-admins` (or `ccui-viewers` for a read-only caller). Then Clients, `ansible-demote`, Service accounts roles tab, click `service-account-ansible-demote`, Groups tab, Join Group, `ccui-admins`.
+
+**5. Optional: token lifespan.** Clients, `ansible-demote`, Advanced tab, Advanced settings, Access Token Lifespan. The default is five minutes. A `demote_broker` and the wait that follows can take longer, and a token that expires in the middle turns the next poll into a 401. Raise it to cover the longest run and no more.
+
+**6. UI variables.**
+
+```env
+CCUI_AUTH_MODE=oidc
+CCUI_PUBLIC_URL=https://cc.example.com
+CCUI_SESSION_SECRET=replace-with-at-least-32-random-characters
+CCUI_OIDC__0__NAME=keycloak
+CCUI_OIDC__0__ISSUER=https://keycloak.example.com/realms/ops
+CCUI_OIDC__0__CLIENT_ID=ccui
+CCUI_OIDC__0__CLIENT_SECRET=replace-me
+CCUI_OIDC__0__ADMIN_GROUPS=ccui-admins
+CCUI_OIDC__0__VIEWER_GROUPS=ccui-viewers
+CCUI_OIDC__0__API_AUDIENCE=ccui-api
+CCUI_CLUSTERS__0__NAME=prod
+CCUI_CLUSTERS__0__URL=http://cc.kafka.svc:9090/kafkacruisecontrol
+```
+
+The token URL for the caller is `<ISSUER>/protocol/openid-connect/token`. The `preferred_username` of the token is `service-account-ansible-demote`, and that is the name in the audit log.
+
+#### Ansible: demote a broker and wait for it to finish
+
+The playbook gets a token with `client_credentials`, starts `demote_broker`, repeats the same request with the `User-Task-ID` it got until Cruise Control answers 200 (see [API](API.md)), and then waits until the executor is idle. Waiting for the task alone is not enough: it ends when the proposal is computed and the execution starts, not when the leadership movements are done.
+
+Save it as `demote_broker.yml`. The secret comes from the environment of the controller, here `CCUI_CLIENT_SECRET`, which your CI or `ansible-vault` fills. Nothing in the file is a real value.
+
+```yaml
+- name: Demote a Kafka broker through the Cruise Control UI
+  hosts: localhost
+  gather_facts: false
+  vars:
+    keycloak_token_url: https://keycloak.example.com/realms/ops/protocol/openid-connect/token
+    ccui_url: https://cc.example.com
+    ccui_cluster: prod
+    ccui_client_id: ansible-demote
+    ccui_client_secret: "{{ lookup('ansible.builtin.env', 'CCUI_CLIENT_SECRET') }}"
+    broker_id: 1
+    demote_url: "{{ ccui_url }}/api/clusters/{{ ccui_cluster }}/proxy/demote_broker?dryrun=false&brokerid={{ broker_id }}"
+    state_url: "{{ ccui_url }}/api/clusters/{{ ccui_cluster }}/proxy/state?substates=EXECUTOR"
+
+  tasks:
+    # no_log hides the token and the secret in the output. Remove it only while debugging, on a test setup.
+    - name: Get an access token
+      ansible.builtin.uri:
+        url: "{{ keycloak_token_url }}"
+        method: POST
+        body_format: form-urlencoded
+        body:
+          grant_type: client_credentials
+          client_id: "{{ ccui_client_id }}"
+          client_secret: "{{ ccui_client_secret }}"
+      register: kc
+      no_log: true
+
+    - name: Start the demotion
+      ansible.builtin.uri:
+        url: "{{ demote_url }}"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ kc.json.access_token }}"
+        status_code: [200, 202]
+      register: demote
+      no_log: true
+
+    - name: Wait for the Cruise Control task
+      ansible.builtin.uri:
+        url: "{{ demote_url }}"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ kc.json.access_token }}"
+          User-Task-ID: "{{ demote.user_task_id }}"
+        status_code: [200, 202]
+      register: task
+      until: task.status == 200
+      retries: 60
+      delay: 10
+      when: demote.status == 202
+      no_log: true
+
+    - name: Wait until the executor is idle
+      ansible.builtin.uri:
+        url: "{{ state_url }}"
+        headers:
+          Authorization: "Bearer {{ kc.json.access_token }}"
+        return_content: true
+      register: executor
+      until: executor.json.ExecutorState.state == 'NO_TASK_IN_PROGRESS'
+      retries: 120
+      delay: 10
+      no_log: true
+```
+
+Run it with the secret in the environment. Put the broker restart in the next play or task, so it only runs when this one succeeded:
+
+```sh
+export CCUI_CLIENT_SECRET   # set from your secret store, not typed in the shell history
+ansible-playbook demote_broker.yml -e broker_id=2
+```
+
+Notes on the playbook:
+
+- Run it once with `dryrun=true` in `demote_url` first. The response shows the proposed leadership movements.
+- Both waits are bounded: 60 tries of 10 seconds for the task and 120 for the executor. When the limit passes the play fails and the broker is not restarted. Raise the numbers for large brokers.
+- The same token is used for the whole play. See the token lifespan in step 5.
+- The calls go through the UI, so they are in the [audit log](SECURITY.md#audit-log) with `user` `service-account-ansible-demote`, `role` `admin`, `endpoint` `demote_broker` and `dryrun` `false`.
+- A viewer service account can do the `state` call but not `demote_broker`.
+- The playbook was written from the Cruise Control and Ansible `uri` documentation and has not been run against a live Cruise Control. Check the `ExecutorState.state` field and the `user_task_id` result name on your versions before the first real run.
 
 ## Sessions
 

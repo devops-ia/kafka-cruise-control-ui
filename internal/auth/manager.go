@@ -115,14 +115,25 @@ func (m *Manager) Routes(mux *http.ServeMux) {
 func (m *Manager) Protect(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id, u, ok := "none", User{Name: "anonymous", Role: Admin}, true
-		if m.cfg.AuthMode != "none" {
+		// A Bearer caller has no ambient credentials, so CSRF and Origin do not apply; an invalid one never falls back to the cookie.
+		h := r.Header.Get("Authorization")
+		viaBearer := len(h) >= 7 && strings.EqualFold(h[:7], "bearer ") && m.apiEnabled()
+		switch {
+		case viaBearer:
+			var code int
+			var msg string
+			if u, code, msg = m.bearer(r.Context(), h[7:]); code != 0 {
+				writeJSON(w, code, map[string]string{"error": msg})
+				return
+			}
+		case m.cfg.AuthMode != "none":
 			id, u, ok = m.current(r)
 		}
 		if !ok {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "authentication required"})
 			return
 		}
-		if !isSafe(r.Method) && (!m.originOK(r) || !m.csrfOK(r, id)) {
+		if !viaBearer && !isSafe(r.Method) && (!m.originOK(r) || !m.csrfOK(r, id)) {
 			writeJSON(w, http.StatusForbidden, map[string]string{"error": "missing or invalid CSRF token or Origin"})
 			return
 		}
