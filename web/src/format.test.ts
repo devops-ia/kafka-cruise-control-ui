@@ -1,4 +1,4 @@
-import { formatBytes, formatMB, formatPct, formatRate } from "./format";
+import { formatBytes, formatMB, formatPct, formatRate, formatTime } from "./format";
 
 describe("units", () => {
   it("shows bytes with binary units", () => {
@@ -14,5 +14,17 @@ describe("units", () => {
   it("formats percentages", () => {
     expect(formatPct(12.345)).toBe("12.3%");
     expect(formatPct(NaN)).toBe("-");
+  });
+});
+
+describe("formatTime", () => {
+  const want = new Date(1760000000000).toLocaleString();
+  it("accepts a number or a numeric string", () => {
+    expect(formatTime(1760000000000)).toBe(want);
+    expect(formatTime("1760000000000")).toBe(want);
+  });
+  it("shows - for missing or invalid values", () => {
+    expect(formatTime(undefined)).toBe("-");
+    expect(formatTime("abc")).toBe("-");
   });
 });

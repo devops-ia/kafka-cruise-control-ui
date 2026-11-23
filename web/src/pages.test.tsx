@@ -300,6 +300,8 @@ describe("read pages", () => {
     render(<UserTasks />);
     expect(await screen.findByText("t-2")).toBeTruthy();
     expect(screen.getByText("Active")).toBeTruthy();
+    expect(document.body.textContent).not.toContain("Invalid Date");
+    expect(screen.getByText(new Date(1760000000000).toLocaleString())).toBeTruthy();
   });
 
   it("Proposals renders the optimization summary", async () => {

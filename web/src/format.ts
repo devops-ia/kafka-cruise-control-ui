@@ -21,6 +21,8 @@ export function formatPct(p: number): string {
   return Number.isFinite(p) ? `${Math.round(p * 10) / 10}%` : "-";
 }
 
-export function formatTime(ms: number): string {
-  return new Date(ms).toLocaleString();
+// CC sends some timestamps as numeric strings (user_tasks StartMs).
+export function formatTime(ms?: number | string): string {
+  const d = new Date(Number(ms ?? NaN));
+  return isNaN(d.getTime()) ? "-" : d.toLocaleString();
 }

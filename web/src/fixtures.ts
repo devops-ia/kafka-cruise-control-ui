@@ -91,7 +91,7 @@ export const ccStateIntra = {
 export const userTasks = {
   version: 1,
   userTasks: [
-    { UserTaskId: "t-1", RequestURL: "POST /kafkacruisecontrol/rebalance?dryrun=true", ClientIdentity: "10.0.0.1", StartMs: 1760000000000, Status: "Completed" },
+    { UserTaskId: "t-1", RequestURL: "POST /kafkacruisecontrol/rebalance?dryrun=true", ClientIdentity: "10.0.0.1", StartMs: "1760000000000", Status: "Completed" },
     { UserTaskId: "t-2", RequestURL: "GET /kafkacruisecontrol/state", ClientIdentity: "10.0.0.2", StartMs: 1760000100000, Status: "Active" },
   ],
 };
