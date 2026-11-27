@@ -73,6 +73,25 @@ export function MovementTable({ title, movements }: { title: string; movements: 
   );
 }
 
+/** Inter-broker replica tasks (Executor lists): `{state, proposal: {topicPartition, oldReplicas, newReplicas}}`. */
+export function InterTaskTable({ tasks }: { tasks: any[] }) {
+  const rows = tasks.map((t) => ({ topic: String(tpOf(t).topic ?? ""), partition: tpOf(t).partition, status: String(t?.state ?? ""), old: list(t?.proposal?.oldReplicas), next: list(t?.proposal?.newReplicas) }));
+  return (
+    <Table
+      caption={`Inter-broker replica movements (${rows.length})`}
+      rows={rows}
+      pageable
+      columns={[
+        { key: "topic", header: "Topic", value: (r) => r.topic },
+        { key: "partition", header: "Partition", value: (r) => r.partition ?? "", numeric: true },
+        { key: "status", header: "Status", value: (r) => r.status },
+        { key: "old", header: "Old replicas", value: (r) => r.old.join(", "), render: (r) => replicas(r.old, r.next, "removed") },
+        { key: "next", header: "New replicas", value: (r) => r.next.join(", "), render: (r) => replicas(r.next, r.old, "added") },
+      ]}
+    />
+  );
+}
+
 /** Intra-broker movements (Executor lists): `{brokerId, proposal: {topicPartition}}`. */
 export function IntraMovementTable({ title, movements }: { title: string; movements: any[] }) {
   const rows = movements.map((m) => ({ topic: String(tpOf(m).topic ?? ""), partition: tpOf(m).partition, broker: m?.brokerId }));

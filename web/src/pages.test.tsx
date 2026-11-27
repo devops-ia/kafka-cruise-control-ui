@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/preact";
-import { ccState, ccStateIntra, clusterState, load, optimization, optimizationVerbose, userTasks } from "./fixtures";
+import { ccState, ccStateInter, ccStateIntra, clusterState, interTask, load, optimization, optimizationVerbose, userTasks } from "./fixtures";
 import { goalsFromState } from "./goals";
 import { CCState } from "./pages/CCState";
 import { ConfigInsights } from "./pages/ConfigInsights";
@@ -763,6 +763,132 @@ describe("result tables", () => {
     render(<CCState />);
     await screen.findByText("No execution in progress.");
     expect(screen.queryByRole("region", { name: /intra-broker movements/ })).toBeNull();
+  });
+});
+
+describe("Executor inter-broker replica movements", () => {
+  const title = /^Inter-broker replica movements/;
+  const open = async (executor: Record<string, unknown> = ccStateInter.ExecutorState) => {
+    const calls = serve({ state: { ...ccState, ExecutorState: executor } });
+    render(<CCState />);
+    await screen.findByText("Recent broker changes");
+    return calls;
+  };
+  const executing = (lists: Record<string, unknown>) => ({ state: "INTER_BROKER_REPLICA_MOVEMENT_TASK_IN_PROGRESS", ...lists });
+  const table = (n: number) => screen.getByRole("region", { name: `Inter-broker replica movements (${n})` });
+  const cells = (t: HTMLElement) => [...t.querySelectorAll("tbody tr")].map((r) => [...r.querySelectorAll("td")].map((c) => c.textContent));
+  const statuses = (t: HTMLElement) => cells(t).map((r) => r[2]);
+
+  it("shows one row per movement with topic, partition, status and both replica lists", async () => {
+    await open(executing({ inProgressPartitionMovement: [interTask("IN_PROGRESS", "orders", 3)] }));
+    expect(within(table(1)).getAllByRole("columnheader").map((h) => h.textContent?.trim())).toEqual(["Topic", "Partition", "Status", "Old replicas", "New replicas"]);
+    expect(cells(table(1))).toEqual([["orders", "3", "IN_PROGRESS", "0, 1 removed", "0, 2 added"]]);
+  });
+
+  it("puts all six lists in one table", async () => {
+    await open();
+    expect(screen.getAllByRole("region", { name: title })).toHaveLength(1);
+    expect(statuses(table(6)).sort()).toEqual(["ABORTED", "ABORTING", "COMPLETED", "DEAD", "IN_PROGRESS", "PENDING"]);
+  });
+
+  it("takes the status from the entry and not from the list name", async () => {
+    await open(executing({ inProgressPartitionMovement: [], pendingPartitionMovement: [interTask("IN_PROGRESS", "orders", 3)] }));
+    expect(statuses(table(1))).toEqual(["IN_PROGRESS"]);
+  });
+
+  it("shows a pending entry of the cancelled list as CANCELLED while stopping", async () => {
+    await open({ state: "STOPPING_EXECUTION", cancelledPartitionMovement: [interTask("PENDING", "orders", 1)], inProgressPartitionMovement: [interTask("IN_PROGRESS", "orders", 2)] });
+    expect(cells(table(2)).map((r) => [r[1], r[2]]).sort()).toEqual([["1", "CANCELLED"], ["2", "IN_PROGRESS"]]);
+  });
+
+  it.each([
+    ["missing", {}],
+    ["empty", Object.fromEntries(["inProgress", "pending", "aborting", "aborted", "dead", "completed", "cancelled"].map((k) => [`${k}PartitionMovement`, []]))],
+  ])("shows no table when the lists are %s and keeps the rest of the tab", async (_, lists) => {
+    await open(executing(lists));
+    expect(screen.queryByRole("region", { name: title })).toBeNull();
+    expect(screen.getByText("Recently demoted brokers")).toBeTruthy();
+    expect(screen.getByText("All fields")).toBeTruthy();
+  });
+
+  it("ignores intra-broker and leadership lists", async () => {
+    await open({ ...ccStateIntra.ExecutorState, pendingLeadershipMovement: [interTask("PENDING", "orders", 9)] });
+    expect(screen.queryByRole("region", { name: title })).toBeNull();
+    expect(screen.getByRole("region", { name: "In progress intra-broker movements (2)" })).toBeTruthy();
+    expect(screen.getByRole("region", { name: "Pending intra-broker movements (1)" })).toBeTruthy();
+  });
+
+  it("survives malformed data", async () => {
+    await open(executing({ completedPartitionMovement: "bad", pendingPartitionMovement: [{ state: "PENDING" }] }));
+    expect(cells(table(1))).toEqual([["", "", "PENDING", "", ""]]);
+  });
+
+  it("has no Create reassignment.json button", async () => {
+    await open();
+    expect(table(6)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Create reassignment.json" })).toBeNull();
+  });
+
+  it("asks only for state with verbose=true, also while filtering", async () => {
+    const calls = await open();
+    fireEvent.click(within(table(6)).getByRole("button", { name: "Filter" }));
+    fireEvent.input(within(table(6)).getByLabelText("Filter Topic"), { target: { value: "orders" } });
+    fireEvent.input(within(table(6)).getByLabelText("Filter Status"), { target: { value: "pend" } });
+    expect(calls.map((c) => [c.method, c.path, c.query.get("verbose")])).toEqual([["GET", proxyPath("a", "state"), "true"]]);
+  });
+
+  const filter = (t: HTMLElement, column: string, value: string) => {
+    if (!within(t).queryByLabelText(`Filter ${column}`)) fireEvent.click(within(t).getByRole("button", { name: "Filter" }));
+    fireEvent.input(within(t).getByLabelText(`Filter ${column}`), { target: { value } });
+  };
+  const many = (n: number, state: string) => Array.from({ length: n }, (_, i) => interTask(state, "orders", i));
+
+  it("filters by status across every page, ignoring case", async () => {
+    await open(executing({ completedPartitionMovement: [...many(12, "COMPLETED"), ...many(2, "PENDING")] }));
+    expect(statuses(table(14))).not.toContain("PENDING"); // both PENDING rows start on page 2
+    filter(table(14), "Status", "pending");
+    expect(statuses(table(14))).toEqual(["PENDING", "PENDING"]);
+  });
+
+  it("combines the topic and status filters and says No rows when nothing matches", async () => {
+    await open(executing({ inProgressPartitionMovement: [interTask("IN_PROGRESS", "orders", 0)], pendingPartitionMovement: [interTask("PENDING", "orders", 1), interTask("PENDING", "payments", 2)] }));
+    filter(table(3), "Topic", "orders");
+    filter(table(3), "Status", "pending");
+    expect(cells(table(3)).map((r) => r.slice(0, 3))).toEqual([["orders", "1", "PENDING"]]);
+    filter(table(3), "Topic", "nope");
+    expect(cells(table(3))).toEqual([["No rows"]]);
+    expect(within(table(3)).getByLabelText("Filter Topic")).toBeTruthy();
+    expect(within(table(3)).getByLabelText("Filter Status")).toBeTruthy();
+  });
+
+  it("shows 10 rows per page with the total in the title", async () => {
+    await open(executing({ pendingPartitionMovement: many(25, "PENDING") }));
+    expect(cells(table(25))).toHaveLength(10);
+    expect(within(table(25)).getByText("Page 1 of 3")).toBeTruthy();
+    expect(within(within(table(25)).getByLabelText("Rows per page")).getAllByRole("option").map((o) => o.textContent)).toEqual(["10", "15", "30", "All"]);
+  });
+
+  it("sorts by status and reverses on a second click", async () => {
+    await open();
+    const header = () => fireEvent.click(within(table(6)).getByRole("button", { name: "Status" }));
+    const sorted = ["ABORTED", "ABORTING", "COMPLETED", "DEAD", "IN_PROGRESS", "PENDING"];
+    header();
+    expect(statuses(table(6))).toEqual(sorted);
+    header();
+    expect(statuses(table(6))).toEqual([...sorted].reverse());
+  });
+
+  it("keeps the status filter across a refresh and applies it to the new data", async () => {
+    let n = 0;
+    mockFetch(() => ({ body: { ...ccState, ExecutorState: executing({ pendingPartitionMovement: many(++n, "PENDING"), completedPartitionMovement: [interTask("COMPLETED", "payments", 0)] }) } }));
+    render(<CCState />);
+    await screen.findByText("Recent broker changes");
+    filter(table(2), "Status", "pend");
+    expect(statuses(table(2))).toEqual(["PENDING"]);
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    await screen.findByRole("region", { name: "Inter-broker replica movements (3)" });
+    expect((within(table(3)).getByLabelText("Filter Status") as HTMLInputElement).value).toBe("pend");
+    expect(statuses(table(3))).toEqual(["PENDING", "PENDING"]);
   });
 });
 
