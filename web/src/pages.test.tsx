@@ -7,6 +7,7 @@ import { ClusterState } from "./pages/ClusterState";
 import { Load } from "./pages/Load";
 import { PartitionLoad } from "./pages/PartitionLoad";
 import { Proposals } from "./pages/Proposals";
+import { ResourceDistribution } from "./pages/ResourceDistribution";
 import { Summary } from "./pages/Summary";
 import { JsonView } from "./components/Results";
 import { UserTasks } from "./pages/UserTasks";
@@ -889,6 +890,246 @@ describe("Executor inter-broker replica movements", () => {
     await screen.findByRole("region", { name: "Inter-broker replica movements (3)" });
     expect((within(table(3)).getByLabelText("Filter Status") as HTMLInputElement).value).toBe("pend");
     expect(statuses(table(3))).toEqual(["PENDING", "PENDING"]);
+  });
+});
+
+describe("Resource distribution", () => {
+  const rec = (topic: string, leader: number, followers: number[] = [], cpu = 0) => ({ topic, partition: 0, leader, followers, cpu });
+  const sample = [rec("orders", 0, [1], 1.5), rec("orders", 0, [1], 2.25), rec("payments", 1, [0], 4)];
+  const brokerList = (...ids: number[]) => ({ KafkaBrokerState: { ReplicaCountByBrokerId: Object.fromEntries(ids.map((i) => [i, 0])) } });
+  const CPU_NOTE = "Leader CPU only: excludes follower CPU. This is not the total CPU of a broker or topic.";
+  const PARTIAL = "Partial result: only the 5000 partitions with the highest leader CPU are included. Values may be low and topics may be missing. Narrow the list with Topic (regex).";
+  const SCOPE = "Offline partitions are not included, and the Cruise Control load model may not cover every partition, so counts can differ from Cluster state.";
+  const NO_LIST = "Broker list unavailable: brokers without partitions in these records are not shown.";
+
+  const table = () => screen.getByRole("table", { name: /by topic and broker/ });
+  const headers = () => within(table()).getAllByRole("columnheader").map((h) => h.textContent?.trim().replace(/ [▲▼]$/, ""));
+  const tds = () => [...table().querySelectorAll("tbody tr")].map((r) => [...r.querySelectorAll("td")]);
+  const rows = () => tds().map((r) => r.map((c) => c.textContent));
+  const levels = () => tds().map((r) => [r[0].textContent, ...r.slice(1).map((c) => c.querySelector("span")!.className.match(/heat-\d/)![0])]);
+  const pick = (metric: string) => fireEvent.click(screen.getByRole("button", { name: metric }));
+  const sortBy = (header: string) => fireEvent.click(within(table()).getByRole("button", { name: header }));
+  const asked = (calls: ReturnType<typeof serve>, ep: string) => calls.filter((c) => c.path.endsWith(`/proxy/${ep}`));
+  const open = async (records: unknown[] = sample, ids = [0, 1, 2]) => {
+    const calls = serve({ partition_load: { version: 1, records }, kafka_cluster_state: brokerList(...ids) });
+    const view = render(<ResourceDistribution />);
+    await screen.findByRole("table", { name: /by topic and broker/ });
+    await waitFor(() => expect(asked(calls, "kafka_cluster_state")).toHaveLength(1));
+    await waitFor(() => expect(headers()).toEqual(expect.arrayContaining(ids.map((i) => `Broker ${i}`))));
+    return { calls, ...view };
+  };
+  const filterTopic = (value: string) => {
+    const input = screen.getByLabelText("Topic (regex)");
+    fireEvent.input(input, { target: { value } });
+    fireEvent.keyDown(input, { key: "Enter" });
+  };
+
+  it("counts leaders by default", async () => {
+    await open();
+    expect(screen.getByRole("button", { name: "Leaders" }).getAttribute("aria-pressed")).toBe("true");
+    expect(headers()).toEqual(["Topic", "Broker 0", "Broker 1", "Broker 2"]);
+    expect(rows()).toEqual([["orders", "2", "0", "0"], ["payments", "0", "1", "0"]]);
+  });
+
+  it("counts the leader and the followers as replicas", async () => {
+    await open();
+    pick("Replicas");
+    expect(rows()).toEqual([["orders", "2", "2", "0"], ["payments", "1", "1", "0"]]);
+  });
+
+  it("adds CPU to the leader only, says so, and has no total", async () => {
+    await open();
+    pick("Leader CPU");
+    expect(rows()).toEqual([["payments", "0%", "4%", "0%"], ["orders", "3.75%", "0%", "0%"]]);
+    expect(screen.getByText(CPU_NOTE)).toBeTruthy();
+    expect(table().getAttribute("aria-label")).toContain("Leader CPU (excludes followers)");
+    expect(within(table()).queryByText(/total/i)).toBeNull();
+    for (const metric of ["Leaders", "Replicas"]) {
+      pick(metric);
+      expect(screen.queryByText(CPU_NOTE)).toBeNull();
+    }
+  });
+
+  it("rounds CPU to 3 decimals and never shows a positive value as 0%", async () => {
+    await open([rec("tiny", 0, [], 0.0002), rec("sum", 1, [], 0.1), rec("sum", 1, [], 0.2)], [0, 1]);
+    pick("Leader CPU");
+    expect(rows()).toEqual([["sum", "0%", "0.3%"], ["tiny", "<0.001%", "0%"]]);
+  });
+
+  it("changes metric without new requests", async () => {
+    const { calls } = await open();
+    pick("Replicas");
+    pick("Leader CPU");
+    pick("Leaders");
+    expect(calls).toHaveLength(2);
+  });
+
+  it("orders rows by the active metric until the user sorts, with ties by topic name", async () => {
+    await open([...sample, rec("audit", 1, [], 0)]);
+    expect(rows().map((r) => r[0])).toEqual(["orders", "audit", "payments"]);
+    pick("Leader CPU");
+    expect(rows().map((r) => r[0])).toEqual(["payments", "orders", "audit"]);
+    pick("Leaders");
+    sortBy("Broker 1");
+    sortBy("Broker 1");
+    expect(rows().map((r) => r[2])).toEqual(["1", "1", "0"]);
+    sortBy("Broker 0");
+    sortBy("Broker 0");
+    expect(rows().map((r) => r[1])).toEqual(["2", "0", "0"]);
+  });
+
+  const twelve = Array.from({ length: 12 }, (_, i) => Array.from({ length: 12 - i }, () => rec(`t${String(i).padStart(2, "0")}`, 0))).flat();
+
+  it("pages 12 topics ten at a time", async () => {
+    await open(twelve, [0]);
+    expect(rows()).toHaveLength(10);
+    expect(within(screen.getByLabelText("Rows per page")).getAllByRole("option").map((o) => o.textContent)).toEqual(["10", "15", "30", "All"]);
+  });
+
+  it("gives each cell a level of 0 to 4 against the largest cell, without style attributes", async () => {
+    const { container } = await open([...Array.from({ length: 8 }, () => rec("big", 0)), ...Array.from({ length: 3 }, () => rec("small", 0))], [0, 1]);
+    expect(levels()).toEqual([["big", "heat-4", "heat-0"], ["small", "heat-2", "heat-0"]]);
+    expect(container.querySelector("[style]")).toBeNull();
+  });
+
+  it("keeps each cell's level across pages and sorting", async () => {
+    await open(twelve, [0]);
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(levels()).toEqual([["t10", "heat-1"], ["t11", "heat-1"]]); // 2 and 1 of a maximum of 12 on page 1
+    sortBy("Broker 0"); // ascending, back on page 1
+    expect(levels()[0]).toEqual(["t11", "heat-1"]);
+    expect(levels()[9]).toEqual(["t02", "heat-4"]);
+  });
+
+  it("keeps a column for a broker without partitions, also when a topic filter concentrates the records", async () => {
+    mockFetch((c) => {
+      if (c.path.endsWith("/proxy/kafka_cluster_state")) return { body: brokerList(0, 1, 2) };
+      return { body: { records: c.query.get("topic") ? [rec("orders", 0, [1])] : sample } };
+    });
+    render(<ResourceDistribution />);
+    await waitFor(() => expect(headers()).toContain("Broker 2"));
+    expect(rows().map((r) => r[3])).toEqual(["0", "0"]);
+    filterTopic("orders");
+    await waitFor(() => expect(rows()).toEqual([["orders", "1", "0", "0"]]));
+    expect(headers()).toContain("Broker 2");
+    expect(screen.queryByText(NO_LIST)).toBeNull();
+  });
+
+  it("takes the columns from the records in numeric order and warns when the broker list fails", async () => {
+    mockFetch((c) => (c.path.endsWith("/proxy/kafka_cluster_state") ? { status: 502, body: { error: "cluster unavailable" } } : { body: { records: [rec("orders", 10, [2])] } }));
+    render(<ResourceDistribution />);
+    expect(await screen.findByText(NO_LIST)).toBeTruthy();
+    expect(headers()).toEqual(["Topic", "Broker 2", "Broker 10"]);
+  });
+
+  it("drops the old broker list and warns when a later refresh of it fails", async () => {
+    let down = false;
+    mockFetch((c) => {
+      if (!c.path.endsWith("/proxy/kafka_cluster_state")) return { body: { records: [rec("orders", 10, [2])] } };
+      return down ? { status: 502, body: { error: "cluster unavailable" } } : { body: { KafkaBrokerState: { ReplicaCountByBrokerId: { "2": 1, "7": 0, "10": 1 } } } };
+    });
+    render(<ResourceDistribution />);
+    await waitFor(() => expect(headers()).toEqual(["Topic", "Broker 2", "Broker 7", "Broker 10"]));
+    down = true;
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    expect(await screen.findByText(NO_LIST)).toBeTruthy();
+    expect(headers()).toEqual(["Topic", "Broker 2", "Broker 10"]);
+  });
+
+  it("sends a trimmed topic filter, omits it when blank and keeps the field when nothing matches", async () => {
+    const calls = serve({ partition_load: { records: [] }, kafka_cluster_state: brokerList(0) });
+    render(<ResourceDistribution />);
+    expect(await screen.findByText("Nothing to show.")).toBeTruthy();
+    expect(asked(calls, "partition_load")[0].query.get("topic")).toBeNull();
+    const last = () => asked(calls, "partition_load").slice(-1)[0].query.get("topic");
+    filterTopic(" orders.* ");
+    await waitFor(() => expect(last()).toBe("orders.*"));
+    expect(await screen.findByText("Nothing to show.")).toBeTruthy();
+    expect((screen.getByLabelText("Topic (regex)") as HTMLInputElement).value).toBe(" orders.* ");
+    fireEvent.input(screen.getByLabelText("Topic (regex)"), { target: { value: "" } });
+    fireEvent.blur(screen.getByLabelText("Topic (regex)"));
+    await waitFor(() => expect(last()).toBeNull());
+  });
+
+  it("shows an error with retry and keeps the field when Cruise Control rejects the expression", async () => {
+    mockFetch((c) => {
+      if (c.path.endsWith("/proxy/kafka_cluster_state")) return { body: brokerList(0) };
+      return c.query.get("topic") ? { status: 500, body: { error: "bad regex" } } : { body: { records: sample } };
+    });
+    render(<ResourceDistribution />);
+    await screen.findByRole("table", { name: /by topic and broker/ });
+    filterTopic("(");
+    expect(await screen.findByText("bad regex")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
+    expect((screen.getByLabelText("Topic (regex)") as HTMLInputElement).value).toBe("(");
+  });
+
+  it("asks for one record more than it uses, sorted by CPU", async () => {
+    const { calls } = await open();
+    const [first] = asked(calls, "partition_load");
+    expect(first.path).toBe(proxyPath("a", "partition_load"));
+    expect([first.query.get("resource"), first.query.get("entries")]).toEqual(["cpu", "5001"]);
+  });
+
+  const full = Array.from({ length: 5000 }, () => rec("orders", 0));
+
+  it("uses only 5000 of 5001 records, warns in every metric, and a topic filter clears the warning", async () => {
+    mockFetch((c) => {
+      if (c.path.endsWith("/proxy/kafka_cluster_state")) return { body: brokerList(0) };
+      return { body: { records: c.query.get("topic") ? sample : [...full, rec("extra", 7, [8], 1)] } };
+    });
+    render(<ResourceDistribution />);
+    expect(await screen.findByText(PARTIAL)).toBeTruthy();
+    expect(screen.getByText("Based on 5000 partition records")).toBeTruthy();
+    await waitFor(() => expect(rows()).toEqual([["orders", "5000"]])); // no "extra" row, no Broker 7 or 8
+    for (const metric of ["Replicas", "Leader CPU"]) {
+      pick(metric);
+      expect(screen.getByText(PARTIAL)).toBeTruthy();
+    }
+    filterTopic("orders|payments");
+    expect(await screen.findByText("Based on 3 partition records")).toBeTruthy();
+    expect(screen.queryByText(PARTIAL)).toBeNull();
+  });
+
+  it("does not warn at exactly 5000 records", async () => {
+    await open(full, [0]);
+    expect(screen.getByText("Based on 5000 partition records")).toBeTruthy();
+    expect(screen.queryByText(PARTIAL)).toBeNull();
+  });
+
+  it("always shows the scope note next to the matrix", async () => {
+    await open();
+    for (const metric of ["Leaders", "Replicas", "Leader CPU"]) {
+      pick(metric);
+      expect(screen.getByText(SCOPE)).toBeTruthy();
+    }
+  });
+
+  it("Refresh repeats both requests for the selected cluster", async () => {
+    const { calls } = await open();
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    await waitFor(() => expect(calls).toHaveLength(4));
+    expect(calls.slice(2).map((c) => c.path).sort()).toEqual([proxyPath("a", "kafka_cluster_state"), proxyPath("a", "partition_load")]);
+  });
+
+  it("auto-refresh repeats both requests", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const { calls } = await open();
+      fireEvent.change(screen.getByLabelText(/Auto-refresh/), { target: { value: "30" } });
+      await vi.advanceTimersByTimeAsync(30500);
+      await waitFor(() => expect([asked(calls, "partition_load").length, asked(calls, "kafka_cluster_state").length]).toEqual([2, 2]));
+    } finally {
+      fireEvent.change(screen.getByLabelText(/Auto-refresh/), { target: { value: "0" } });
+      vi.useRealTimers();
+    }
+  });
+
+  it("shows the error with Retry and no matrix when partition_load fails", async () => {
+    mockFetch((c) => (c.path.endsWith("/proxy/kafka_cluster_state") ? { body: brokerList(0) } : { status: 502, body: { error: "cluster unavailable" } }));
+    render(<ResourceDistribution />);
+    expect(await screen.findByRole("button", { name: "Retry" })).toBeTruthy();
+    expect(screen.queryByRole("table")).toBeNull();
   });
 });
 

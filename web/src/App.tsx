@@ -12,6 +12,7 @@ import { Login } from "./pages/Login";
 import { PartitionLoad } from "./pages/PartitionLoad";
 import { PeerReview } from "./pages/PeerReview";
 import { Proposals } from "./pages/Proposals";
+import { ResourceDistribution } from "./pages/ResourceDistribution";
 import { Summary } from "./pages/Summary";
 import { UserTasks } from "./pages/UserTasks";
 import { Link, navigate, path } from "./router";
@@ -35,6 +36,7 @@ export const ROUTES: Route[] = [
   { path: "/config", title: "Config insights", group: "Overview", view: () => <ConfigInsights /> },
   { path: "/load", title: "Load", group: "Load", view: () => <Load /> },
   { path: "/partition-load", title: "Partition load", group: "Load", view: () => <PartitionLoad /> },
+  { path: "/resource-distribution", title: "Resource distribution", group: "Load", view: () => <ResourceDistribution /> },
   { path: "/proposals", title: "Proposals", group: "Operations", admin: true, view: () => <Proposals /> },
   { path: "/admin", title: "Admin", group: "Operations", admin: true, view: () => <Admin /> },
   { path: "/review", title: "Peer review", group: "Operations", admin: true, view: () => <PeerReview /> },

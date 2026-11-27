@@ -65,7 +65,7 @@ This is also why `max.active.user.tasks` matters on the Cruise Control side: eac
 
 The embedded files are served from `/`. `index.html` is never cached and gets the nonce in each `<script` tag. Files under `/assets/` have content hashes and are cached for a year. A path without a file extension that matches no file returns `index.html`, so client-side routes survive a reload. A path with an extension that matches no file is a 404. Paths with `..` are 404 before the router can redirect them.
 
-Client routes: `/summary`, `/state`, `/cc-state`, `/config`, `/load`, `/partition-load`, `/proposals`, `/admin`, `/review` and `/tasks`. The SPA keeps the theme, the selected cluster and the refresh interval in `localStorage`. The session is only the cookie.
+Client routes: `/summary`, `/state`, `/cc-state`, `/config`, `/load`, `/partition-load`, `/resource-distribution`, `/proposals`, `/admin`, `/review` and `/tasks`. The SPA keeps the theme, the selected cluster and the refresh interval in `localStorage`. The session is only the cookie.
 
 ## Sessions and CSRF
 
