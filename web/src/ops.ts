@@ -11,6 +11,8 @@ export interface Field {
   /** A checked box sends false (for parameters whose Cruise Control default is true). */
   invert?: boolean;
   options?: { value: string; label: string }[];
+  /** Adds a broker table under the text input; both edit the same comma separated value. */
+  picker?: boolean;
 }
 
 export interface Operation {
@@ -54,7 +56,7 @@ const dataFrom: Field = {
 };
 const assigner: Field = { name: "kafka_assigner", label: "Kafka assigner mode", kind: "bool" };
 const destinations: Field = { name: "destination_broker_ids", label: "Destination broker IDs", kind: "text", help: "Comma separated, for example 1,2" };
-const brokers = (help: string): Field => ({ name: "brokerid", label: "Broker IDs", kind: "text", required: true, help });
+const brokers = (help: string, picker?: boolean): Field => ({ name: "brokerid", label: "Broker IDs", kind: "text", required: true, help, picker });
 
 export const OPERATIONS: Operation[] = [
   { id: "rebalance", group: "Rebalance", title: "Rebalance", endpoint: "rebalance", description: "Move replicas and leaders to balance the cluster.", dryRunnable: true, confirm: true, verbose: true, fields: [goals, ...tuning, capacity, readyGoals, dataFrom, assigner, destinations] },
@@ -112,7 +114,7 @@ export const OPERATIONS: Operation[] = [
     dryRunnable: true,
     confirm: true,
     verbose: true,
-    fields: [brokers("Comma separated, for example 3"), { name: "throttle_removed_broker", label: "Throttle removed broker", kind: "bool" }, goals, ...tuning, capacity, readyGoals, dataFrom, assigner, destinations],
+    fields: [brokers("Comma separated, for example 3", true), { name: "throttle_removed_broker", label: "Throttle removed broker", kind: "bool" }, goals, ...tuning, capacity, readyGoals, dataFrom, assigner, destinations],
   },
   {
     id: "demote_broker",
@@ -124,7 +126,7 @@ export const OPERATIONS: Operation[] = [
     confirm: true,
     verbose: true,
     fields: [
-      brokers("Comma separated, for example 3"),
+      brokers("Comma separated, for example 3", true),
       { name: "skip_urp_demotion", label: "Skip under-replicated partitions", kind: "bool" },
       { name: "exclude_follower_demotion", label: "Exclude follower demotion", kind: "bool" },
       tuning[1],

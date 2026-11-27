@@ -1,22 +1,25 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/preact";
 import type { Role } from "./api";
-import { ccState, clusterState, optimization } from "./fixtures";
+import { ccState, clusterState, load, optimization } from "./fixtures";
 import { Admin } from "./pages/Admin";
 import { session } from "./session";
 import { act } from "@testing-library/preact";
 import { setCluster } from "./store";
 import { tasks } from "./tasks";
-import { mockFetch, proxyPath } from "./testutil";
+import { mockFetch, proxyPath, type Call, type Reply } from "./testutil";
 
-function setup(role: Role = "admin", cluster = "prod-b", kcs: object = clusterState) {
+function setup(role: Role = "admin", cluster = "prod-b", kcs: object = clusterState, override?: (c: Call) => Reply | undefined) {
   localStorage.clear();
   tasks.set([]);
   setCluster(cluster);
   session.set({ authenticated: true, mode: "local", user: "ana", role, csrfToken: "tok" });
   return mockFetch((c) => {
     if (c.method === "POST") return { body: optimization };
+    const o = override?.(c);
+    if (o) return o;
     if (c.path.endsWith("/state")) return { body: ccState };
     if (c.path.endsWith("/kafka_cluster_state")) return { body: kcs };
+    if (c.path.endsWith("/load")) return { body: load };
   });
 }
 const posts = (calls: ReturnType<typeof mockFetch>) => calls.filter((c) => c.method === "POST");
@@ -302,5 +305,206 @@ describe("Admin", () => {
     const details = screen.getByText("Goals, optional").closest("details")!;
     expect(details.open).toBe(false);
     expect(screen.getByText(/Execute changes the real cluster, Simulate does not/)).toBeTruthy();
+  });
+});
+
+describe("Admin broker picker", () => {
+  // kafka_cluster_state with these broker ids, and a load answer with host kafka-<id> for each.
+  const kcsOf = (...ids: number[]) => ({ KafkaBrokerState: { ReplicaCountByBrokerId: Object.fromEntries(ids.map((i) => [i, 1])) } });
+  const loadOf = (...ids: number[]) => ({ brokers: ids.map((i) => ({ Broker: i, Host: `kafka-${i}`, BrokerState: "ALIVE" })) });
+  const down: Reply = { status: 500, body: { errorMessage: "boom" } };
+  const pending: Reply = { status: 202, headers: { "User-Task-ID": "t" } };
+  const replies = (kcs: Reply, ld: Reply) => (c: Call) => (c.path.endsWith("/kafka_cluster_state") ? kcs : c.path.endsWith("/load") ? ld : undefined);
+  const brokers = (...ids: number[]) => replies({ body: kcsOf(...ids) }, { body: loadOf(...ids) });
+
+  function open(name = "Remove broker", override = brokers(0, 1)) {
+    const calls = setup("admin", "prod-b", clusterState, override);
+    render(<Admin />);
+    tab(name);
+    return calls;
+  }
+  const box = async (id: number) => (await screen.findByLabelText(`Broker ${id}`)) as HTMLInputElement;
+  const check = async (id: number) => fireEvent.click(await box(id));
+  const field = () => screen.getByLabelText(/Broker IDs/) as HTMLInputElement;
+  const type = (value: string) => fireEvent.input(field(), { target: { value } });
+  const table = () => within(screen.getByRole("region", { name: "Brokers" }));
+  // Cell texts after the checkbox column: id, host, state.
+  const rows = () => table().getAllByRole("checkbox").map((c) => [...c.closest("tr")!.cells].slice(1).map((td) => td.textContent));
+  const filterHost = (value: string) => {
+    if (!table().queryByLabelText("Filter Host")) fireEvent.click(table().getByRole("button", { name: "Filter" }));
+    fireEvent.input(table().getByLabelText("Filter Host"), { target: { value } });
+  };
+  const sent = async (calls: Call[]) => {
+    pick("Simulate");
+    await vi.waitFor(() => expect(posts(calls)).toHaveLength(1));
+    return posts(calls)[0].query;
+  };
+
+  it("shows one row per broker, ordered by id, with id, host and state", async () => {
+    open("Remove broker", replies({ body: kcsOf(1, 0) }, { body: { brokers: [{ Broker: 1, Host: "kafka-1", BrokerState: "DEAD" }, { Broker: 0, Host: "kafka-0", BrokerState: "ALIVE" }] } }));
+    await screen.findByText("kafka-1");
+    expect(rows()).toEqual([["0", "kafka-0", "ALIVE"], ["1", "kafka-1", "DEAD"]]);
+    expect(table().getAllByRole("columnheader").map((h) => h.textContent)).toEqual(["Select", "ID", "Host", "State"]);
+  });
+
+  it("remove broker sends the two marked brokers and counts them", async () => {
+    const calls = open();
+    await check(0);
+    await check(1);
+    expect(screen.getByText("2 of 2 brokers selected")).toBeTruthy();
+    const q = await sent(calls);
+    expect(posts(calls)[0].path).toBe(proxyPath("prod-b", "remove_broker"));
+    expect([q.get("brokerid"), q.get("dryrun")]).toEqual(["0,1", "true"]);
+  });
+
+  it("demote broker sends the marked broker", async () => {
+    const calls = open("Demote broker");
+    await check(1);
+    const q = await sent(calls);
+    expect(posts(calls)[0].path).toBe(proxyPath("prod-b", "demote_broker"));
+    expect([q.get("brokerid"), q.get("dryrun")]).toEqual(["1", "true"]);
+  });
+
+  it("unchecking removes the broker", async () => {
+    const calls = open();
+    await check(0);
+    await check(1);
+    await check(0);
+    expect((await sent(calls)).get("brokerid")).toBe("1");
+  });
+
+  it("sends nothing without a selection", async () => {
+    const calls = open();
+    await check(1);
+    await check(1);
+    pick("Simulate");
+    expect(posts(calls)).toHaveLength(0);
+  });
+
+  it("switching cluster shows the new brokers with nothing selected", async () => {
+    open("Remove broker", (c) => brokers(...(c.path.includes("prod-c") ? [1, 5] : [0, 1]))(c));
+    await check(1);
+    act(() => setCluster("prod-c"));
+    await box(5);
+    expect(screen.queryByLabelText("Broker 0")).toBeNull();
+    expect(table().getAllByRole("checkbox").map((c) => (c as HTMLInputElement).checked)).toEqual([false, false]);
+    expect(field().value).toBe("");
+  });
+
+  it("add broker keeps the field and has no table", () => {
+    const calls = open("Add broker");
+    expect(field()).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "Brokers" })).toBeNull();
+    expect(calls.filter((c) => c.path.endsWith("/load"))).toHaveLength(0);
+  });
+
+  it("keeps a selection hidden by the filter, also after clearing it", async () => {
+    const calls = open();
+    await check(0);
+    await screen.findByText("kafka-1");
+    filterHost("kafka-1");
+    expect(rows().map((r) => r[0])).toEqual(["1"]);
+    await check(1);
+    expect((await sent(calls)).get("brokerid")).toBe("0,1");
+    filterHost("");
+    expect([(await box(0)).checked, (await box(1)).checked]).toEqual([true, true]);
+  });
+
+  it("keeps the selection across pages", async () => {
+    const calls = open("Remove broker", brokers(...Array.from({ length: 16 }, (_, i) => i)));
+    await check(0);
+    fireEvent.click(table().getByRole("button", { name: "Next" }));
+    await check(15);
+    expect((await sent(calls)).get("brokerid")).toBe("0,15");
+  });
+
+  it("typing ids checks their boxes, ignoring spaces", async () => {
+    open();
+    await box(0);
+    type("0, 1");
+    expect([(await box(0)).checked, (await box(1)).checked]).toEqual([true, true]);
+  });
+
+  it("matches ids exactly", async () => {
+    open("Remove broker", brokers(1, 11));
+    await box(1);
+    type("11");
+    expect([(await box(1)).checked, (await box(11)).checked]).toEqual([false, true]);
+  });
+
+  it("checking a box keeps a typed id that is not in the table", async () => {
+    open();
+    await box(1);
+    type("7");
+    await check(1);
+    expect(field().value).toBe("7,1");
+  });
+
+  it("sends a typed id without touching the table", async () => {
+    const calls = open();
+    type("3");
+    expect((await sent(calls)).get("brokerid")).toBe("3");
+  });
+
+  it("lists selectable ids and says so when load fails", async () => {
+    const calls = open("Remove broker", replies({ body: kcsOf(0, 1) }, down));
+    expect((await screen.findByText(/Host and state could not be read/)).textContent).toContain("boom");
+    await box(1);
+    expect(rows()).toEqual([["0", "", ""], ["1", "", ""]]);
+    await check(1);
+    expect((await sent(calls)).get("brokerid")).toBe("1");
+  });
+
+  it("lists selectable ids while load has not answered", async () => {
+    open("Remove broker", replies({ body: kcsOf(0, 1) }, pending));
+    await check(1);
+    expect((await box(1)).checked).toBe(true);
+    expect(screen.getByText("Reading host and state...")).toBeTruthy();
+  });
+
+  it("lists brokers from load when kafka_cluster_state fails", async () => {
+    open("Remove broker", replies(down, { body: loadOf(0, 1) }));
+    await box(1);
+    expect(rows()).toEqual([["0", "kafka-0", "ALIVE"], ["1", "kafka-1", "ALIVE"]]);
+  });
+
+  it("includes a broker found in only one source once", async () => {
+    open("Remove broker", replies({ body: kcsOf(0, 1) }, { body: loadOf(0, 1, 2) }));
+    await box(2);
+    expect(rows().map((r) => r[0])).toEqual(["0", "1", "2"]);
+  });
+
+  it("says brokers cannot be read when neither source answers, and the field still works", async () => {
+    const calls = open("Remove broker", replies(down, down));
+    expect(await screen.findByText(/Brokers could not be read from the cluster/)).toBeTruthy();
+    type("3");
+    expect((await sent(calls)).get("brokerid")).toBe("3");
+  });
+
+  it("says so when the cluster reports no brokers", async () => {
+    open("Remove broker", brokers());
+    expect(await screen.findByText(/reports no brokers/)).toBeTruthy();
+  });
+
+  it("the dialog and the request include brokers hidden by the filter", async () => {
+    const calls = open();
+    await check(0);
+    await check(1);
+    await screen.findByText("kafka-1");
+    filterHost("kafka-1");
+    pick("Execute");
+    expect(within(screen.getByRole("alertdialog")).getByText("0,1")).toBeTruthy();
+    pick("Execute on prod-b");
+    await vi.waitFor(() => expect(posts(calls)).toHaveLength(1));
+    expect([posts(calls)[0].query.get("brokerid"), posts(calls)[0].query.get("dryrun")]).toEqual(["0,1", "false"]);
+  });
+
+  it("the demote dialog names the broker and Cancel sends nothing", async () => {
+    const calls = open("Demote broker");
+    await check(1);
+    pick("Execute");
+    expect(within(screen.getByRole("alertdialog")).getByText("1")).toBeTruthy();
+    pick("Cancel");
+    expect(posts(calls)).toHaveLength(0);
   });
 });
