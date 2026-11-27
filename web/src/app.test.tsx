@@ -58,7 +58,7 @@ describe("App", () => {
     const nav = await screen.findByRole("navigation", { name: "Main" });
     expect([...nav.querySelectorAll("h2")].map((h) => h.textContent)).toEqual(["Overview", "Load", "Operations", "Tasks"]);
     expect([...nav.querySelectorAll("a")].map((a) => a.textContent)).toEqual([
-      "Summary", "Cluster state", "Cruise Control state", "Config insights", "Load", "Partition load", "Proposals", "Admin", "Peer review", "User tasks",
+      "Summary", "Cluster state", "Cruise Control state", "Config insights", "Load", "Partition load", "Resource distribution", "Proposals", "Admin", "Peer review", "User tasks",
     ]);
   });
 
@@ -171,7 +171,7 @@ describe("App", () => {
     render(<App />);
     const nav = await screen.findByRole("navigation", { name: "Main" });
     expect([...nav.querySelectorAll("h2")].map((h) => h.textContent)).toEqual(["Overview", "Load"]);
-    expect(await links()).toEqual(["Summary", "Cluster state", "Cruise Control state", "Config insights", "Load", "Partition load"]);
+    expect(await links()).toEqual(["Summary", "Cluster state", "Cruise Control state", "Config insights", "Load", "Partition load", "Resource distribution"]);
   });
 
   it.each(["/tasks", "/proposals", "/admin", "/review"])("viewer on %s gets a 403 page and no request for it", async (page) => {
@@ -187,7 +187,7 @@ describe("App", () => {
     asRole("admin");
     navigate("/summary");
     render(<App />);
-    expect((await links()).length).toBe(10);
+    expect((await links()).length).toBe(11);
     // the build's version sits under the title; tests build without one
     expect(document.querySelector(".brand .build")?.textContent).toBe("dev");
     expect(document.querySelector(".brand img")).toBeNull(); // no CCUI_LOGO_URL: the built-in mark
@@ -202,7 +202,7 @@ describe("App", () => {
     cleanup();
     asRole("admin", "none");
     render(<App />);
-    expect((await links()).length).toBe(10);
+    expect((await links()).length).toBe(11);
   });
 
   describe("Peer review in the sidebar", () => {
@@ -225,7 +225,7 @@ describe("App", () => {
       navigate("/summary");
       render(<App />);
       await waitFor(async () => expect(await hasReview()).toBe(false));
-      expect(await links()).toEqual(["Summary", "Cluster state", "Cruise Control state", "Config insights", "Load", "Partition load", "Proposals", "Admin", "User tasks"]);
+      expect(await links()).toEqual(["Summary", "Cluster state", "Cruise Control state", "Config insights", "Load", "Partition load", "Resource distribution", "Proposals", "Admin", "User tasks"]);
     });
 
     it("follows the selected cluster without a reload", async () => {

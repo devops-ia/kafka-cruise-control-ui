@@ -93,9 +93,9 @@ A `viewer` may call the five endpoints marked viewer. Everything else needs `adm
 | `bootstrap` | GET | admin |  | no page, API only |
 | `demote_broker` | POST | admin | yes | Admin |
 | `fix_offline_replicas` | POST | admin | yes | Admin |
-| `kafka_cluster_state` | GET | viewer |  | Cluster state, Summary |
+| `kafka_cluster_state` | GET | viewer |  | Cluster state, Summary, Resource distribution |
 | `load` | GET | viewer |  | Load |
-| `partition_load` | GET | viewer |  | Partition load |
+| `partition_load` | GET | viewer |  | Partition load, Resource distribution |
 | `pause_sampling` | POST | admin |  | Admin |
 | `permissions` | GET | viewer |  | Config insights |
 | `proposals` | GET | admin |  | Proposals |

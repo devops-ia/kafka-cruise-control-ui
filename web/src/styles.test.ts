@@ -49,6 +49,7 @@ describe("styles.css", () => {
     ["--ok", "--ok-bg", 4.5], ["--ok", "--surface", 4.5], ["--bad", "--surface", 4.5], ["--warn", "--warn-bg", 4.5], ["--bad", "--bad-bg", 4.5],
     ["--rail-text", "--rail", 4.5], ["--rail-label", "--rail", 4.5], ["--rail-active-text", "--rail-active", 4.5], ["--rail-focus", "--rail", 3],
     ["--control-border", "--surface", 3], ["--accent", "--bg", 3],
+    ["--ink", "--heat-1", 4.5], ["--ink", "--heat-2", 4.5], ["--ink", "--heat-3", 4.5], ["--ink", "--heat-4", 4.5],
   ];
   const themes: [string, Record<string, string>][] = [
     ["light", tokens(":root")],

@@ -14,7 +14,7 @@ In `none` mode the server logs a warning at start. The CSRF and `Origin` checks 
 
 | Role | Pages | Cruise Control endpoints |
 | --- | --- | --- |
-| `viewer` | Summary, Cluster state, Cruise Control state, Config insights, Load, Partition load | `kafka_cluster_state`, `state`, `load`, `partition_load`, `permissions` |
+| `viewer` | Summary, Cluster state, Cruise Control state, Config insights, Load, Partition load, Resource distribution | `kafka_cluster_state`, `state`, `load`, `partition_load`, `permissions` |
 | `admin` | All pages, including Proposals, Admin, Peer review and User tasks | Everything the server forwards, see the [table in Security](SECURITY.md#role-gate-per-cruise-control-endpoint) |
 
 The gate is on the server, not in the SPA. A viewer who types the address of the Admin page sees a "403 Forbidden" page, and a viewer who calls the API with curl gets 403 with `{"error":"your role does not allow this operation"}`. Any POST needs `admin`, whatever the endpoint is.

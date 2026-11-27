@@ -31,6 +31,10 @@
   --danger: #b42323;
   --on-danger: #ffffff;
   --focus: #1c64a8;
+  --heat-1: #e3eefa;
+  --heat-2: #c6ddf4;
+  --heat-3: #a3c8ed;
+  --heat-4: #7db0e3;
   --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --s1: 4px;
@@ -69,6 +73,10 @@
     --danger: #f09a9a;
     --on-danger: #1a0505;
     --focus: #6fb1ee;
+    --heat-1: #172a40;
+    --heat-2: #1b3a5a;
+    --heat-3: #1f4b75;
+    --heat-4: #245d91;
   }
 }
 
@@ -99,6 +107,10 @@
   --danger: #f09a9a;
   --on-danger: #1a0505;
   --focus: #6fb1ee;
+  --heat-1: #172a40;
+  --heat-2: #1b3a5a;
+  --heat-3: #1f4b75;
+  --heat-4: #245d91;
 }
 
 * {
@@ -514,6 +526,23 @@ th button.sort {
 }
 th.num {
   font-family: var(--font);
+}
+/* Resource distribution heatmap: level 0 has no fill */
+.heat {
+  display: block;
+  padding: 0 var(--s1);
+}
+.heat-1 {
+  background: var(--heat-1);
+}
+.heat-2 {
+  background: var(--heat-2);
+}
+.heat-3 {
+  background: var(--heat-3);
+}
+.heat-4 {
+  background: var(--heat-4);
 }
 tr.filters td {
   padding: var(--s1);
