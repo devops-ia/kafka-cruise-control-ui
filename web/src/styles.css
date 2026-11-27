@@ -908,7 +908,8 @@ progress.bar::-moz-progress-bar {
   gap: var(--s4);
   margin-top: var(--s3);
 }
-.logdirs {
+.logdirs,
+.broker-picker {
   align-self: stretch; /* .field shrinks its content; this table spans the form like the header above it */
 }
 .logdir {

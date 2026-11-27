@@ -6,6 +6,8 @@ import { useResource } from "../hooks";
 import { buildParams, OPERATIONS, type Field, type Operation, type Values } from "../ops";
 import { cluster as clusterStore, useStore } from "../store";
 import { runTask } from "../tasks";
+import { brokerRows } from "./ClusterState";
+import { Host } from "./Load";
 
 function GoalPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const { goals, error } = useGoals();
@@ -87,6 +89,53 @@ function LogDirPicker({ value, onChange }: { value: string; onChange: (v: string
   );
 }
 
+/** Edits the same comma separated text as the "Broker IDs" input, so ids that are not in the table are kept. */
+function BrokerPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const state = useResource("kafka_cluster_state");
+  const load = useResource("load");
+  const chosen = value
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const toggle = (id: string) => onChange((chosen.includes(id) ? chosen.filter((c) => c !== id) : [...chosen, id]).join(","));
+  // Union of both sources by id: load needs a Cruise Control load model, but only load has host and state.
+  const byId = new Map<number, { id: number; host: string; state: string }>();
+  for (const { id } of brokerRows(state.data)) byId.set(id, { id, host: "", state: "" });
+  for (const b of load.data?.brokers ?? []) byId.set(b.Broker, { id: b.Broker, host: b.Host ?? "", state: b.BrokerState ?? "" });
+  const rows = [...byId.values()].sort((a, b) => a.id - b.id);
+  if (rows.length === 0) {
+    if ([state, load].some((r) => !r.data && !r.error)) return <p class="muted">Reading brokers from the cluster...</p>;
+    const error = state.error ?? load.error;
+    if (error) return <p class="muted">Brokers could not be read from the cluster: {error.message}. Type the IDs in Broker IDs.</p>;
+    return <p class="muted">This cluster reports no brokers. Type the IDs in Broker IDs.</p>;
+  }
+  return (
+    <div class="stack broker-picker">
+      <p class="muted" aria-live="polite">
+        {rows.filter((r) => chosen.includes(String(r.id))).length} of {rows.length} brokers selected
+      </p>
+      {!load.data && <p class="muted">{load.error ? `Host and state could not be read: ${load.error.message}` : "Reading host and state..."}</p>}
+      <Table
+        caption="Brokers"
+        rows={rows}
+        rowKey={(r) => r.id}
+        pageable
+        columns={[
+          {
+            key: "pick",
+            header: "Select",
+            value: (r) => (chosen.includes(String(r.id)) ? 1 : 0),
+            render: (r) => <input type="checkbox" aria-label={`Broker ${r.id}`} checked={chosen.includes(String(r.id))} onChange={() => toggle(String(r.id))} />,
+          },
+          { key: "id", header: "ID", value: (r) => r.id, numeric: true },
+          { key: "host", header: "Host", value: (r) => r.host, render: (r) => <Host name={r.host} /> },
+          { key: "state", header: "State", value: (r) => r.state },
+        ]}
+      />
+    </div>
+  );
+}
+
 function FieldInput({ f, values, set }: { f: Field; values: Values; set: (name: string, v: string | boolean) => void }) {
   const id = `f-${f.name}`;
   if (f.kind === "goals") {
@@ -136,7 +185,7 @@ function FieldInput({ f, values, set }: { f: Field; values: Values; set: (name: 
     "aria-describedby": f.help ? `${id}-help` : undefined,
     onInput: (e: Event) => set(f.name, (e.target as HTMLInputElement).value),
   };
-  return (
+  const input = (
     <div class="field">
       <label for={id}>
         {f.label}
@@ -154,6 +203,15 @@ function FieldInput({ f, values, set }: { f: Field; values: Values; set: (name: 
         </small>
       )}
     </div>
+  );
+  if (!f.picker) return input;
+  return (
+    <>
+      {input}
+      <div class="field wide">
+        <BrokerPicker value={common.value} onChange={(v) => set(f.name, v)} />
+      </div>
+    </>
   );
 }
 
