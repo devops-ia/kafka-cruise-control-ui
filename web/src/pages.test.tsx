@@ -85,6 +85,41 @@ describe("read pages", () => {
     await waitFor(() => expect(calls[calls.length - 1].query.get("topic")).toBeNull());
   });
 
+  // Picks by visible text, as a user does, whatever the option value is.
+  const sortBy = (text: string) => {
+    const select = screen.getByLabelText(/^Sort by/) as HTMLSelectElement;
+    const option = [...select.options].find((o) => o.text === text)!;
+    fireEvent.change(select, { target: { value: option.value } });
+  };
+
+  it("Partition load sends a resource Cruise Control accepts for each Sort by option, disk by default", async () => {
+    const calls = serve({ partition_load: { records: [] } });
+    render(<PartitionLoad />);
+    await screen.findByText("Nothing to show.");
+    const select = screen.getByLabelText(/^Sort by/) as HTMLSelectElement;
+    expect(select.selectedOptions[0].text).toBe("disk");
+    expect([...select.options].map((o) => o.text)).toEqual(["cpu", "networkInbound", "networkOutbound", "disk"]);
+    expect(calls[0].query.get("resource")).toBe("disk");
+    for (const [text, resource] of [["networkInbound", "NW_IN"], ["networkOutbound", "NW_OUT"], ["cpu", "cpu"], ["disk", "disk"]]) {
+      sortBy(text);
+      await waitFor(() => expect(calls[calls.length - 1].query.get("resource")).toBe(resource));
+    }
+  });
+
+  it("Partition load sorted by networkInbound keeps CC's row order and shows each record's Net in rate", async () => {
+    const records = [
+      { topic: "orders", partition: 0, networkInbound: 2048 },
+      { topic: "orders", partition: 1, networkInbound: 1024 },
+    ];
+    mockFetch((c) => ({ body: { records: c.query.get("resource") === "NW_IN" ? records : [] } }));
+    render(<PartitionLoad />);
+    await screen.findByText("Nothing to show.");
+    sortBy("networkInbound");
+    const rows = await screen.findAllByRole("row", { name: /orders/ });
+    expect(rows.map((r) => within(r).getAllByRole("cell")[5].textContent)).toEqual(["2 MiB/s", "1 MiB/s"]);
+    expect(screen.getByRole("columnheader", { name: /Net in/ }).getAttribute("aria-sort")).toBe("none");
+  });
+
   it("Cluster state is one partition health table with the broker role as a tag", async () => {
     serve({ kafka_cluster_state: clusterState });
     render(<ClusterState />);

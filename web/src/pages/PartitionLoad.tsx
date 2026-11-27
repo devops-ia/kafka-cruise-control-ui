@@ -17,9 +17,11 @@ export function PartitionLoad() {
       <label>
         Sort by
         <select value={resource} onChange={(e) => setResource((e.target as HTMLSelectElement).value)}>
-          {["cpu", "networkInbound", "networkOutbound", "disk"].map((r) => (
-            <option key={r}>{r}</option>
-          ))}
+          {/* The labels are CC's response field names; its resource parameter wants NW_IN and NW_OUT. */}
+          <option>cpu</option>
+          <option value="NW_IN">networkInbound</option>
+          <option value="NW_OUT">networkOutbound</option>
+          <option>disk</option>
         </select>
       </label>
       <label>
