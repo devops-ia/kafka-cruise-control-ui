@@ -391,11 +391,60 @@ describe("Admin broker picker", () => {
     expect(field().value).toBe("");
   });
 
-  it("add broker keeps the field and has no table", () => {
-    const calls = open("Add broker");
+  it("add broker has the field and the table", async () => {
+    open("Add broker");
+    await screen.findByText("kafka-1");
     expect(field()).toBeTruthy();
+    expect(table().getAllByRole("columnheader").map((h) => h.textContent)).toEqual(["Select", "ID", "Host", "State"]);
+    expect(rows()).toEqual([["0", "kafka-0", "ALIVE"], ["1", "kafka-1", "ALIVE"]]);
+  });
+
+  it("add broker sends the two marked brokers and counts them", async () => {
+    const calls = open("Add broker", brokers(0, 1, 2, 3));
+    await check(2);
+    await check(3);
+    expect(screen.getByText("2 of 4 brokers selected")).toBeTruthy();
+    const q = await sent(calls);
+    expect(posts(calls)[0].path).toBe(proxyPath("prod-b", "add_broker"));
+    expect([q.get("brokerid"), q.get("dryrun")]).toEqual(["2,3", "true"]);
+  });
+
+  it("add broker can mark a new broker with no replicas that load does not report", async () => {
+    const calls = open("Add broker", replies({ body: { KafkaBrokerState: { ReplicaCountByBrokerId: { 0: 120, 1: 80, 2: 0 } } } }, { body: loadOf(0, 1) }));
+    await screen.findByText("kafka-1");
+    expect(rows()).toEqual([["0", "kafka-0", "ALIVE"], ["1", "kafka-1", "ALIVE"], ["2", "", ""]]);
+    await check(2);
+    const q = await sent(calls);
+    expect(posts(calls)[0].path).toBe(proxyPath("prod-b", "add_broker"));
+    expect(q.get("brokerid")).toBe("2");
+  });
+
+  it("add broker sends typed ids that are not in the table yet", async () => {
+    const calls = open("Add broker");
+    await box(1);
+    type("3,4");
+    const q = await sent(calls);
+    expect(posts(calls)[0].path).toBe(proxyPath("prod-b", "add_broker"));
+    expect([q.get("brokerid"), q.get("dryrun")]).toEqual(["3,4", "true"]);
+  });
+
+  it("the add broker dialog and request mix a typed id and a marked box", async () => {
+    const calls = open("Add broker", brokers(0, 1, 2));
+    await box(2);
+    type("7");
+    await check(2);
+    pick("Execute");
+    expect(within(screen.getByRole("alertdialog")).getByText("7,2")).toBeTruthy();
+    pick("Execute on prod-b");
+    await vi.waitFor(() => expect(posts(calls)).toHaveLength(1));
+    expect(posts(calls)[0].path).toBe(proxyPath("prod-b", "add_broker"));
+    expect([posts(calls)[0].query.get("brokerid"), posts(calls)[0].query.get("dryrun")]).toEqual(["7,2", "false"]);
+  });
+
+  it("rebalance keeps destination broker ids as a text field with no table", () => {
+    open("Rebalance");
+    expect((screen.getByLabelText("Destination broker IDs") as HTMLInputElement).type).toBe("text");
     expect(screen.queryByRole("region", { name: "Brokers" })).toBeNull();
-    expect(calls.filter((c) => c.path.endsWith("/load"))).toHaveLength(0);
   });
 
   it("keeps a selection hidden by the filter, also after clearing it", async () => {
