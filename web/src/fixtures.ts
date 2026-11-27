@@ -88,6 +88,26 @@ export const ccStateIntra = {
   },
 };
 
+// Inter-broker task shape read from the CC `main` sources (ExecutionTask, ExecutionProposal); not yet checked against a live CC.
+export const interTask = (state: string, topic: string, partition: number, oldReplicas = [0, 1], newReplicas = [0, 2]) => ({
+  executionId: partition,
+  type: "INTER_BROKER_REPLICA_ACTION",
+  state,
+  proposal: { ...tp(topic, partition), oldLeader: oldReplicas[0], oldReplicas, newReplicas },
+});
+export const ccStateInter = {
+  ...ccState,
+  ExecutorState: {
+    state: "INTER_BROKER_REPLICA_MOVEMENT_TASK_IN_PROGRESS",
+    inProgressPartitionMovement: [interTask("IN_PROGRESS", "orders", 3)],
+    pendingPartitionMovement: [interTask("PENDING", "orders", 4)],
+    abortingPartitionMovement: [interTask("ABORTING", "orders", 5)],
+    abortedPartitionMovement: [interTask("ABORTED", "payments", 0)],
+    deadPartitionMovement: [interTask("DEAD", "payments", 1)],
+    completedPartitionMovement: [interTask("COMPLETED", "payments", 2)],
+  },
+};
+
 export const userTasks = {
   version: 1,
   userTasks: [

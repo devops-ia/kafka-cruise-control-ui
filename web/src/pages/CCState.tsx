@@ -3,7 +3,7 @@ import { Async } from "../components/Async";
 import { Tabs } from "../components/KeyValues";
 import { Progress } from "../components/Meter";
 import { Panel, Rows } from "../components/Panel";
-import { IntraMovementTable } from "../components/MovementTable";
+import { InterTaskTable, IntraMovementTable } from "../components/MovementTable";
 import { JsonView } from "../components/Results";
 import { Table } from "../components/Table";
 import { formatMB, formatPct, formatTime } from "../format";
@@ -50,9 +50,20 @@ function intraLists(e: any): [string, any[]][] {
   });
 }
 
+const INTER = ["inProgress", "pending", "aborting", "aborted", "dead", "completed", "cancelled"];
+
+// Each entry keeps its own state; CC lists as cancelled the tasks still PENDING when the stop was requested.
+const interTasks = (e: any): any[] =>
+  INTER.flatMap((k) => {
+    const l = e[`${k}PartitionMovement`];
+    if (!Array.isArray(l)) return [];
+    return k === "cancelled" ? l.map((t) => (t?.state === "PENDING" ? { ...t, state: "CANCELLED" } : t)) : l;
+  });
+
 function Executor({ e }: { e: any }) {
   if (!e) return <p class="muted">No executor data.</p>;
   const task = e.triggeredUserTaskId || e.triggeredSelfHealingTaskId;
+  const inter = interTasks(e);
   return (
     <div class="stack">
       <Panel title="Progress" aside={tag(executorActive(e) ? String(e.state) : "IDLE", executorActive(e) ? "warn" : "ok")}>
@@ -75,6 +86,7 @@ function Executor({ e }: { e: any }) {
       <Panel title="Recent broker changes">
         <Rows rows={[["Recently demoted brokers", brokers(e.recentlyDemotedBrokers)], ["Recently removed brokers", brokers(e.recentlyRemovedBrokers)]]} />
       </Panel>
+      {inter.length > 0 && <InterTaskTable tasks={inter} />}
       {intraLists(e).map(([title, rows]) => rows.length > 0 && <IntraMovementTable key={title} title={title} movements={rows} />)}
       <AllFields data={e} />
     </div>
